@@ -1,5 +1,5 @@
 // processing.cpp
-#include "processing.h"
+#include "server/processing.h"
 #include <stdio.h>
 
 void start_processing_service() {

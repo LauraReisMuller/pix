@@ -1,0 +1,15 @@
+
+build/
+*.exe
+*.out
+*.bin
+*.o
+*.obj
+*.tmp
+*~
+.d
+*.log
+*.core
+.vscode/
+*.swp
+.idea/

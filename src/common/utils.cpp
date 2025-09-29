@@ -1,5 +1,5 @@
 // Funções utilitárias (timestamp, formatação de logs)
-#include "utils.h"
+#include "common/utils.h"
 #include <stdio.h>
 #include <time.h>
 
