@@ -1,5 +1,6 @@
 #include "server/discovery.h"
 #include "common/protocol.h"
+#include "server/databases.h"
 #include "common/utils.h"
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -33,7 +34,7 @@ void ServerDiscovery::setupSocket() {
     _sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (_sockfd < 0) {
         log_message("ERROR opening server socket");
-        throw std::runtime_error("Failed to open socket.");
+        throw runtime_error("Failed to open socket.");
     }
 
     // O servidor deve conseguir receber mensagens broadcast (embora seja passivo)
@@ -44,7 +45,7 @@ void ServerDiscovery::setupSocket() {
     if (bind(_sockfd, (struct sockaddr *) &_serv_addr, sizeof(struct sockaddr)) < 0) {
         log_message("ERROR on binding server socket");
         close(_sockfd);
-        throw std::runtime_error("Failed to bind socket.");
+        throw runtime_error("Failed to bind socket.");
     }
     log_message("Server socket bound and listening for discovery messages.");
 }
@@ -62,14 +63,19 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
 
     // NOTA: Registra o novo cliente na tabela (Lógica do Servidor a ser implementada! - Gui e Max)
     //... registra o cliente, inicializa o saldo (100 reais) e o last_req=0.
-
     char client_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+
+    int client_port = ntohs(client_addr.sin_port);
+    string client_key = string(client_ip) + ":" + to_string(client_port);
+    server_db.addClient(client_key);
     
     // NOTA: A lógica de registro e threads deve ser implementada aqui. 
     // Por enquanto, apenas o log e a resposta.
     
-    std::string log_msg = "Received DISCOVERY from client: " + std::string(client_ip);
+    string log_msg = "Received DISCOVERY from client: " + string(client_ip);
+    server_db.getClient(client_key);
+    
     log_message(log_msg.c_str());
 
     //Resposta Unicast: Confirma o endereço do servidor para o cliente
@@ -84,7 +90,7 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     if (n < 0) {
         log_message("ERROR on sendto discovery ACK");
     } else {
-        std::string ack_msg = "Sent ACK to discovered client: " + std::string(client_ip);
+        string ack_msg = "Sent ACK to discovered client: " + string(client_ip);
         log_message(ack_msg.c_str());
     }
 }
@@ -96,7 +102,7 @@ void ServerDiscovery::startDiscoveryListener() {
 
     try {
         setupSocket();
-    } catch (const std::runtime_error& e) {
+    } catch (const runtime_error& e) {
         return; 
     }
 

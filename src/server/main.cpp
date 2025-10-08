@@ -1,4 +1,5 @@
 #include "server/discovery.h"
+#include "common/utils.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -6,18 +7,18 @@
 int main(int argc, char* argv[]) {
 
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <PORT>" << std::endl;
+        cerr << "Usage: " << argv[0] << " <PORT>" << endl;
         return 1;
     }
     
     int port;
     try {
-        port = std::stoi(argv[1]);
-    } catch (const std::invalid_argument& e) {
-        std::cerr << "Invalid port number." << std::endl;
+        port = stoi(argv[1]);
+    } catch (const invalid_argument& e) {
+        cerr << "Invalid port number." << endl;
         return 1;
-    } catch (const std::out_of_range& e) {
-        std::cerr << "Port number out of range." << std::endl;
+    } catch (const out_of_range& e) {
+        cerr << "Port number out of range." << endl;
         return 1;
     }
 
@@ -30,8 +31,8 @@ int main(int argc, char* argv[]) {
         // Inicia o loop de escuta (bloqueia o main, ou seria em uma thread separada)
         server_disco.startDiscoveryListener();
         
-    } catch (const std::exception& e) {
-        std::cerr << "Server Error: " << e.what() << std::endl;
+    } catch (const exception& e) {
+        cerr << "Server Error: " << e.what() << endl;
         return 1;
     }
 
