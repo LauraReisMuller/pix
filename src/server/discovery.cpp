@@ -67,12 +67,10 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
     int client_port = ntohs(client_addr.sin_port);
-    string client_key = string(client_ip) + ":" + to_string(client_port);
+    string client_key = string(client_ip) + ":" + to_string(client_port); // Ip e porta do cliente.
     server_db.addClient(client_key);
     
-    // NOTA: A lógica de registro e threads deve ser implementada aqui. 
-    // Por enquanto, apenas o log e a resposta.
-    
+    // Log de teste.
     string log_msg = "Received DISCOVERY from client: " + string(client_ip);
     server_db.getClient(client_key);
     
