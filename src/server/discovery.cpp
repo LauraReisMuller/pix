@@ -55,6 +55,7 @@ void ServerDiscovery::setupSocket() {
  * @param client_addr Endereço do cliente obtido via recvfrom.
  */
 void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen) {
+    
     //Verificar o tipo de pacote
     if (packet.type != PKT_DISCOVER) {
         // Ignora pacotes que não sejam de descoberta neste listener (ex: REQ)
@@ -66,8 +67,7 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     char client_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
-    int client_port = ntohs(client_addr.sin_port);
-    string client_key = string(client_ip) + ":" + to_string(client_port); // Ip e porta do cliente.
+    string client_key = string(client_ip);
     server_db.addClient(client_key);
     
     // Log de teste.
@@ -80,7 +80,8 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     
     // Criar um pacote ACK/Resposta para Descoberta
     Packet discovery_ack;
-    discovery_ack.type = PKT_ACK; 
+    discovery_ack.type = PKT_DISCOVER_ACK;
+    discovery_ack.seqn = 0; 
     
     ssize_t n = sendto(_sockfd, (const char*)&discovery_ack, sizeof(Packet), 0, 
                        (const struct sockaddr *) &client_addr, clilen);
