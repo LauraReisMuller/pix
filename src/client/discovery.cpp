@@ -87,6 +87,12 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
         ssize_t n = recvfrom(_sockfd, (char*)&response_packet, sizeof(Packet), 0, 
                              (struct sockaddr*)&server_info, &len);
         
+        //Verifica se o pacote recebido é realmente um ACK de descoberta
+        if (response_packet.type != PKT_DISCOVER_ACK) {
+            log_message("Received unexpected packet type during discovery. Ignoring.");
+            return false;
+        }
+        
         if (n < 0) {
             log_message("ERROR on recvfrom during discovery");
             return false;
@@ -113,7 +119,7 @@ std::string ClientDiscovery::discoverServer() {
     // Prepara o pacote de DESCOBERTA
     Packet discovery_packet;
     discovery_packet.type = PKT_DISCOVER;
-    discovery_packet.id = 0; // O ID não é relevante para o Descobrimento
+    discovery_packet.seqn = 0; // O ID não é relevante para o Descobrimento
 
     struct sockaddr_in server_info;
     socklen_t len = sizeof(server_info);
