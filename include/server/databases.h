@@ -75,4 +75,4 @@ public:
 };
 
 // Instância única do banco de dados do servidor
-static ServerDatabase server_db;
+extern ServerDatabase server_db;

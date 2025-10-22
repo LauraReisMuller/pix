@@ -59,6 +59,7 @@ include/
     protocol.h
     utils.h
   server/
+    databases.h
     discovery.h
     processing.h
     interface.h
@@ -74,6 +75,7 @@ src/
     discovery.cpp
     processing.cpp
     interface.cpp
+    databases.cpp
   client/
     main.cpp
     discovery.cpp

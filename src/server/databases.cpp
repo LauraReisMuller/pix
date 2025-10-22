@@ -1,6 +1,8 @@
 #include "server/databases.h"
 #include <iostream>
 
+ServerDatabase server_db;  // Definição da instância global
+
 // addClient: Método Escrita na tabela cliente
 bool ServerDatabase::addClient(const string& ip_address) {
     lock_guard<mutex> lock(client_table_mutex);
