@@ -1,5 +1,9 @@
 // Funções utilitárias (timestamp, formatação de logs)
 #include "common/utils.h"
+#include <cstdint>
+#include <string>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <time.h>
 

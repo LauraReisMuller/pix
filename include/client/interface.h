@@ -29,6 +29,7 @@ public:
 
     // O construtor deve receber uma referência ao RequestManager para delegar comandos
     ClientInterface(ClientRequest& request_manager);
+    ~ClientInterface();
 
     void start();
     void stop();

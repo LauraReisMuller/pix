@@ -2,6 +2,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cstdint> 
+#include <string>
+
 using namespace std;
 
 void print_timestamp();
