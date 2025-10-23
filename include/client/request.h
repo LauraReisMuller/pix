@@ -42,7 +42,7 @@ private:
     std::queue<std::tuple<std::string, uint32_t>> _command_queue; //Fila de comandos do usuário
     std::mutex _queue_mutex;
     std::condition_variable _queue_cv;
-    bool _running = true;
+    std::atomic<bool> _running = true;
 
     //Referencia à interface para notificar a thread de saída
     ClientInterface* _interface;
@@ -52,8 +52,6 @@ private:
 
     //Logica bloqueante principal (envio, timeout e reenvio)
     bool sendRequestWithRetry(const Packet& request_packet);
-
-    std::atomic<bool> _running = true;
 
 };
 
