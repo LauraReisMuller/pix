@@ -22,12 +22,13 @@ struct ClientAck {
     uint32_t new_balance;
 };
 
+class ClientRequest;
+
 class ClientInterface {
 public:
-    using CommandHandler = function<void(const string& dest_ip, uint32_t value)>;
 
-    explicit ClientInterface(CommandHandler onCommand);
-    ~ClientInterface();
+    // O construtor deve receber uma referência ao RequestManager para delegar comandos
+    ClientInterface(ClientRequest& request_manager);
 
     void start();
     void stop();
@@ -39,11 +40,11 @@ public:
     void displayDiscoverySuccess(const string& server_ip);
 
 private:
+    ClientRequest& _request_manager;
     void inputLoop();   // lê stdin
     void outputLoop();  // imprime acks
     string nowTimestamp() const;
 
-    CommandHandler onCommand_;
     thread in_th_, out_th_;
     mutex m_;
     condition_variable cv_;

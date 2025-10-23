@@ -1,5 +1,7 @@
 // interface.cpp
 #include "client/interface.h"
+#include "common/utils.h" 
+#include "client/request.h"
 #include <stdio.h>
 #include <iostream>
 
@@ -7,8 +9,9 @@
 #include <chrono>
 #include <ctime>
 
-ClientInterface::ClientInterface(CommandHandler onCommand)
-    : onCommand_(move(onCommand)) {}
+// Recebe e armazena a referência ao RequestManager
+ClientInterface::ClientInterface(ClientRequest& request_manager)
+    : _request_manager(request_manager) {}
 
 ClientInterface::~ClientInterface() { stop(); }
 
@@ -56,6 +59,8 @@ string ClientInterface::nowTimestamp() const {
 
 // Thread de input fica em loop lendo comandos do cliente no terminal.
 void ClientInterface::inputLoop() {
+    using namespace std;
+
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
 
@@ -73,7 +78,7 @@ void ClientInterface::inputLoop() {
             continue;
         }
 
-        if (onCommand_) onCommand_(dest_ip, value);
+        _request_manager.enqueueCommand(dest_ip, value);
     }
 }
 

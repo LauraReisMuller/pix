@@ -1,6 +1,9 @@
 #include "client/discovery.h"
 #include "client/interface.h"
+#include "client/request.h"
 #include "common/utils.h"
+
+#include <thread>
 #include <iostream>
 #include <string>
 #include <stdexcept>
@@ -34,21 +37,22 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    Interface client_interface;
+    ClientRequest request_manager(server_ip, port); 
+    ClientInterface client_interface(request_manager); 
+    request_manager.setInterface(&client_interface); 
+    client_interface.start(); 
     client_interface.displayDiscoverySuccess(server_ip);
     
     // Simulação do loop principal (que será substituído pela lógica de multithreading)
-    // O cliente deve ler da entrada padrão (teclado) o próximo comando.
     cout << "O cliente está aguardando comandos (IP_DESTINO VALOR)..." << endl;
     
-    // Por enquanto, o programa apenas aguarda a interrupção (Ctrl+C ou Ctrl+D)
-    while(cin.good()) {
-        
-        string line;
-        getline(cin, line);
-    }
-    
-    cout << "Encerrando cliente." << endl;
-    
+    // 4. Iniciar a Thread de Processamento de Requisições
+    // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)
+    std::thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
+
+    // Esperar pelas threads (opcional, mas bom para evitar que o main termine)
+    processing_thread.join();
+    client_interface.stop(); // O stop é mais complexo com threads.
+
     return EXIT_SUCCESS;
 }

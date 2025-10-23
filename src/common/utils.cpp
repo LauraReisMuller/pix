@@ -13,3 +13,25 @@ void log_message(const char *msg) {
     print_timestamp();
     printf("%s\n", msg);
 }
+
+uint32_t ipToUint32(const std::string& ip_str) {
+
+    struct in_addr addr;
+    
+    if (inet_pton(AF_INET, ip_str.c_str(), &addr) != 1) {
+        log_message("ERROR: Invalid IP format in ipToUint32.");
+        return 0;
+    }
+    
+    return addr.s_addr; 
+}
+
+std::string uint32ToIp(uint32_t ip_int) {
+    
+    struct in_addr addr;
+    addr.s_addr = ip_int;
+    char ip_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN);
+    
+    return std::string(ip_str);
+}
