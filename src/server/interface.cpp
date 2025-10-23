@@ -1,9 +1,6 @@
 // interface.cpp
 #include "server/interface.h"
 #include "server/databases.h"
-#include <iostream>
-#include <iomanip>
-#include <chrono>
 
 ServerInterface server_interface;
 
@@ -34,22 +31,11 @@ void ServerInterface::notifyUpdate(const string& logline) {
     cv_.notify_one();
 }
 
-string ServerInterface::nowTimestamp() const {
-    using namespace chrono;
-    auto tp = system_clock::now();
-    time_t t = system_clock::to_time_t(tp);
-    tm tm{};
-    localtime_r(&t, &tm);
-    char buf[32];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
-    return buf;
-}
-
 void ServerInterface::run() {
     // Mensagem inicial com dados do BankSummary
     {
         auto summary = server_db.getBankSummary();
-        cout << nowTimestamp()
+        cout << get_timestamp_str()
                   << " num transactions " << summary.num_transactions
                   << " total transferred " << summary.total_transferred
                   << " total balance " << summary.total_balance
@@ -66,7 +52,7 @@ void ServerInterface::run() {
 
             // Imprime linha de log (ex.: req, dup, etc.)
             if (!line.empty()) {
-                cout << nowTimestamp() << " " << line << endl;
+                cout << get_timestamp_str() << " " << line << endl;
             }
 
             // Imprime resumo atualizado

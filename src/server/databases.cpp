@@ -1,5 +1,4 @@
 #include "server/databases.h"
-#include <iostream>
 
 ServerDatabase server_db;  // Definição da instância global
 
