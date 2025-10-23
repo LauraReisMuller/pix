@@ -57,40 +57,71 @@ void ServerDiscovery::setupSocket() {
 void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen) {
     
     //Verificar o tipo de pacote
-    if (packet.type != PKT_DISCOVER) {
-        // Ignora pacotes que não sejam de descoberta neste listener (ex: REQ)
-        return; 
+    if (packet.type == PKT_DISCOVER) {
+        // NOTA: Registra o novo cliente na tabela (Lógica do Servidor a ser implementada! - Gui e Max)
+        //... registra o cliente, inicializa o saldo (100 reais) e o last_req=0.
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+
+        string client_key = string(client_ip);
+        server_db.addClient(client_key);
+        
+        // Log de teste.
+        string log_msg = "Received DISCOVERY from client: " + string(client_ip);
+        server_db.getClient(client_key);
+        
+        log_message(log_msg.c_str());
+
+        //Resposta Unicast: Confirma o endereço do servidor para o cliente
+        
+        // Criar um pacote ACK/Resposta para Descoberta
+        Packet discovery_ack;
+        discovery_ack.type = PKT_DISCOVER_ACK;
+        discovery_ack.seqn = 0; 
+        
+        ssize_t n = sendto(_sockfd, (const char*)&discovery_ack, sizeof(Packet), 0, 
+                        (const struct sockaddr *) &client_addr, clilen);
+        
+        if (n < 0) {
+            log_message("ERROR on sendto discovery ACK");
+        } else {
+            string ack_msg = "Sent ACK to discovered client: " + string(client_ip);
+            log_message(ack_msg.c_str());
+        }
     }
 
-    // NOTA: Registra o novo cliente na tabela (Lógica do Servidor a ser implementada! - Gui e Max)
-    //... registra o cliente, inicializa o saldo (100 reais) e o last_req=0.
-    char client_ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+    // 2. Lógica de Teste de Requisição (PKT_REQUEST)
+    else if (packet.type == PKT_REQUEST) {
+            // *** BLOCO DE TESTE RÁPIDO: Envia ACK para o cliente ***
 
-    string client_key = string(client_ip);
-    server_db.addClient(client_key);
-    
-    // Log de teste.
-    string log_msg = "Received DISCOVERY from client: " + string(client_ip);
-    server_db.getClient(client_key);
-    
-    log_message(log_msg.c_str());
+            // Aplicar .c_str() na string concatenada
+            log_message(("TEST: Received PKT_REQUEST. Sending ACK immediately for SeqN " + std::to_string(packet.seqn)).c_str());
 
-    //Resposta Unicast: Confirma o endereço do servidor para o cliente
-    
-    // Criar um pacote ACK/Resposta para Descoberta
-    Packet discovery_ack;
-    discovery_ack.type = PKT_DISCOVER_ACK;
-    discovery_ack.seqn = 0; 
-    
-    ssize_t n = sendto(_sockfd, (const char*)&discovery_ack, sizeof(Packet), 0, 
-                       (const struct sockaddr *) &client_addr, clilen);
-    
-    if (n < 0) {
-        log_message("ERROR on sendto discovery ACK");
-    } else {
-        string ack_msg = "Sent ACK to discovered client: " + string(client_ip);
-        log_message(ack_msg.c_str());
+            // Prepara um pacote ACK (Simulando sucesso)
+            Packet request_ack;
+            request_ack.type = PKT_REQUEST_ACK;
+            request_ack.seqn = packet.seqn; // Deve sempre confirmar o SeqN recebido!
+            
+            // Simulação: Novo saldo para o cliente (pode ser um valor fixo, ex: 100)
+            request_ack.ack.new_balance = 100; 
+
+            // Envia o ACK de volta para o cliente (unicast)
+            ssize_t n = sendto(_sockfd, (const char*)&request_ack, sizeof(Packet), 0, 
+                            (const struct sockaddr *) &client_addr, clilen);
+            
+            if (n < 0) {
+                // Se a função log_message receber char* (o que é o padrão):
+                log_message("TEST ERROR: Failed to send ACK.");
+            } else {
+                // Aplicar .c_str() na string concatenada
+                log_message(("TEST: ACK sent successfully for SeqN " + std::to_string(packet.seqn)).c_str());
+            }
+            return; 
+        }
+        else {
+        // Ignora outros pacotes
+        log_message(("Ignored unexpected packet type: " + std::to_string(packet.type)).c_str());
+        return;
     }
 }
 
