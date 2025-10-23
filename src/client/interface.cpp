@@ -43,7 +43,7 @@ void ClientInterface::pushAck(const ClientAck& ack) {
 }
 
 void ClientInterface::displayDiscoverySuccess(const string& server_ip) {
-    cout << nowTimestamp() << " discovery ok server " << server_ip << endl;
+    cout << nowTimestamp() << " server_addr " << server_ip << endl;
 }
 
 string ClientInterface::nowTimestamp() const {

@@ -56,6 +56,16 @@ void ClientRequest::setupSocket() {
     log_message("Request socket created.");
 }
 
+
+void ClientRequest::stopProcessing() {
+    log_message("RequestManager received stop signal. Stopping processing loop.");
+    
+    //Sinaliza a flag de parada
+    _running = false; 
+    //Acorda a thread que está bloqueada em cv.wait()
+    _queue_cv.notify_all(); 
+}
+
 /*--- Sincronização (Fila Thread-Safe) ---*/
 
 void ClientRequest::enqueueCommand(const std::string& dest_ip, uint32_t value) {

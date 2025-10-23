@@ -8,7 +8,22 @@
 #include <string>
 #include <stdexcept>
 #include <cstdlib> 
+#include <csignal>
 
+using namespace std;
+
+//flag global de execucao para tratamento de sinal
+atomic<bool> global_running{true};
+
+//Handler de sinal (para ctrl+c)
+void signal_handler(int signum) {
+
+    if (signum == SIGINT) {
+
+        //Sinaliza a todas as threads que o programa deve parar
+        global_running = false; 
+    }
+}
 
 int main(int argc, char* argv[]) {
 
@@ -50,9 +65,19 @@ int main(int argc, char* argv[]) {
     // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)
     std::thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
 
-    // Esperar pelas threads (opcional, mas bom para evitar que o main termine)
+    // Espera até que o usuário pressione CTRL+D ou CTRL+C.
+    while (global_running.load() && cin.good()) {
+
+        // O thread principal apenas pausa para não consumir CPU
+        this_thread::sleep_for(chrono::milliseconds(100));
+    }
+
+    // Sinaliza todas as threads para pararem
+    global_running = false; 
+    request_manager.stopProcessing();
+
+    client_interface.stop();
     processing_thread.join();
-    client_interface.stop(); // O stop é mais complexo com threads.
 
     return EXIT_SUCCESS;
 }

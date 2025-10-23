@@ -27,6 +27,7 @@ public:
     
     //Loop principal de envio (com lógica bloqueante)
     void runProcessingLoop();
+    void stopProcessing();
 
 private:
 
@@ -51,6 +52,8 @@ private:
 
     //Logica bloqueante principal (envio, timeout e reenvio)
     bool sendRequestWithRetry(const Packet& request_packet);
+
+    std::atomic<bool> _running = true;
 
 };
 
