@@ -2,14 +2,6 @@
 #include "common/protocol.h"
 #include "server/database.h"
 #include "common/utils.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <string.h>
-#include <iostream>
-#include <stdexcept>
 
 void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen, int sockfd) {
     
@@ -19,8 +11,6 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
         return; 
     }
 
-    // NOTA: Registra o novo cliente na tabela (Lógica do Servidor a ser implementada! - Gui e Max)
-    //... registra o cliente, inicializa o saldo (100 reais) e o last_req=0.
     char client_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 

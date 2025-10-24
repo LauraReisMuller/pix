@@ -3,22 +3,33 @@
 
 ServerDatabase server_db;  // Definição da instância global
 
+/* === Transações === */
+
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
     log_message("Entered makeTransaction");
 
     // Garante que a aritmética em ponto flutuante assinado evite wraparound não assinado
     double amount = static_cast<double>(packet.req.value);
 
-    // Valida antes de tocar nos saldos/histórico
-    if (!validateTransaction(origin_ip, dest_ip, amount)) {
-        log_message("Transaction validation failed. Aborting transaction.");
-        return false;
+    // Validação com READ lock
+    {
+        ReadGuard read_lock(client_table_lock);
+        
+        if (!validateTransaction(origin_ip, dest_ip, amount)) {
+            log_message("Transaction validation failed inside makeTransaction.");
+            return false;
+        }
     }
 
-    // Atualiza saldos dos clientes, TEM QUE SER OPERAÇÃO ATÔMICA
-    if(!updateClientBalance(origin_ip, -amount)) { log_message("Update origin client balance error."); }
-    if(!updateClientBalance(dest_ip,  amount)) { log_message("Update destination client balance error."); }
-    log_message("Updated balances");
+    // Modificação com WRITE lock
+    {
+        WriteGuard write_lock(client_table_lock);
+
+        if(!updateClientBalance(origin_ip, -amount)) { log_message("Update origin client balance error."); }
+        if(!updateClientBalance(dest_ip,  amount)) { log_message("Update destination client balance error."); }
+        log_message("Updated balances");
+    }
+
 
     addTransaction(origin_ip, packet.seqn, dest_ip, amount);
 
@@ -29,9 +40,9 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
 
     // Print BankSummary after a successful transaction
     BankSummary summary = getBankSummary();
-    string log_message = " num transactions " + std::to_string(summary.num_transactions) + 
-                         " total transferred " + std::to_string(summary.total_transferred) + 
-                         " total balance " + std::to_string(summary.total_balance);
+    string log_message = " num transactions " + to_string(summary.num_transactions) + 
+                         " total transferred " + to_string(summary.total_transferred) + 
+                         " total balance " + to_string(summary.total_balance);
     server_interface.notifyUpdate(log_message);
 
     return true;
@@ -43,8 +54,9 @@ bool ServerDatabase::validateTransaction(const string& origin_ip, const string& 
         return false;
     }
 
-    lock_guard<mutex> lock(client_table_mutex);
+    ReadGuard read_lock(client_table_lock);
     auto it_orig = client_table.find(origin_ip);
+
     if (it_orig == client_table.end()) {
         log_message("validateTransaction: origin client not found.");
         return false;
@@ -64,40 +76,52 @@ bool ServerDatabase::validateTransaction(const string& origin_ip, const string& 
     return true;
 }
 
-/* Tabela de clientes */
+/* === Tabela de Clientes === */
 
-// Escrita
 bool ServerDatabase::addClient(const string& ip_address) {
-    lock_guard<mutex> lock(client_table_mutex);
+    WriteGuard write_lock(client_table_lock);
 
-    // Cliente já existe
-    if (client_table.find(ip_address) != client_table.end()) {
+    bool clientExists = (client_table.find(ip_address) != client_table.end());
+
+    if (clientExists) {
         return false;
     }
+
     client_table.emplace(ip_address, Client(ip_address));
+/*
+    {
+        lock_guard<mutex> lock(bank_summary_mutex);
+        bank_summary.total_balance += 100.0;  // Saldo inicial do cliente
+    }
+*/
     return true;
 }
 
-// Leitura
+
 Client* ServerDatabase::getClient(const string& ip_address) {
-    lock_guard<mutex> lock(client_table_mutex);
-    auto it = client_table.find(ip_address);
-    if (it != client_table.end()) {
+    ReadGuard read_lock(client_table_lock);
+
+    bool clientExists = (client_table.find(ip_address) != client_table.end());
+
+    if (clientExists) {
         // Exibe informações do cliente
-        cout << "Client Key: " << it->second.ip << endl; // Ip e porta do cliente.
-        cout << "Client Last_req: " << it->second.last_req << endl;
-        cout << "Client Balance: " << it->second.balance << endl;
-        return &(it->second);
+        cout << "Client Key: " << client_table[ip_address].ip << endl; // Ip e porta do cliente.
+        cout << "Client Last_req: " << client_table[ip_address].last_req << endl;
+        cout << "Client Balance: " << client_table[ip_address].balance << endl;
+        return &(client_table[ip_address]);
     }
+
     return nullptr;
 }
 
 // Escrita
 bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
-    lock_guard<mutex> lock(client_table_mutex);
-    auto it = client_table.find(ip_address);
-    if (it != client_table.end()) {
-        it->second.last_req = req_number;
+    WriteGuard write_lock(client_table_lock);
+
+    bool clientExists = (client_table.find(ip_address) != client_table.end());
+
+    if (clientExists) {
+        client_table[ip_address].last_req = req_number;
         return true;
     }
     return false;
@@ -105,10 +129,12 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
 
 // Escrita
 bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
-    lock_guard<mutex> lock(client_table_mutex);
-    auto it = client_table.find(ip_address);
-    if (it != client_table.end()) {
-        it->second.balance += transaction_value;
+    WriteGuard write_lock(client_table_lock);
+
+    bool clientExists = (client_table.find(ip_address) != client_table.end());
+
+    if (clientExists) {
+        client_table[ip_address].balance += transaction_value;
         return true;
     }
     return false;
@@ -116,11 +142,13 @@ bool ServerDatabase::updateClientBalance(const string& ip_address, double transa
 
 // Leitura
 vector<Client> ServerDatabase::getAllClients() const {
-    lock_guard<mutex> lock(client_table_mutex);
+    ReadGuard read_lock(client_table_lock);
     vector<Client> clients;
+
     for (const auto& pair : client_table) {
         clients.push_back(pair.second);
     }
+
     return clients;
 }
 
@@ -128,21 +156,32 @@ vector<Client> ServerDatabase::getAllClients() const {
 
 // Escrita
 int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
-    int tx_id = getNextTransactionId();
-    lock_guard<mutex> lock(transaction_history_mutex);
+    int tx_id = next_transaction_id.fetch_add(1);
+
+    WriteGuard write_lock(transaction_history_lock);
     transaction_history.emplace_back(tx_id, origin_ip, req_id, destination_ip, amount);
+
+/*
+    // Atualiza estatísticas do banco
+    {
+        lock_guard<mutex> lock(bank_summary_mutex);
+        bank_summary.num_transactions++;
+        bank_summary.total_transferred += amount;
+    }
+*/
     return tx_id;
 }
 
 // Leitura
 vector<Transaction> ServerDatabase::getTransactionHistory() const {
-    lock_guard<mutex> lock(transaction_history_mutex);
+    ReadGuard read_lock(transaction_history_lock);
     return transaction_history;
 }
 
 // Leitura
 Transaction* ServerDatabase::getTransactionById(int tx_id) {
-    lock_guard<mutex> lock(transaction_history_mutex);
+    ReadGuard read_lock(transaction_history_lock);
+
     for (auto& tx : transaction_history) {
         if (tx.id == tx_id) {
             return &tx;
@@ -161,9 +200,8 @@ BankSummary ServerDatabase::getBankSummary() const {
 
 // Escrita
 void ServerDatabase::updateBankSummary() {
-    lock_guard<mutex> lock1(bank_summary_mutex);
-    lock_guard<mutex> lock2(transaction_history_mutex);
-    lock_guard<mutex> lock3(client_table_mutex);
+    ReadGuard read_lock(client_table_lock);
+    lock_guard<mutex> summary_lock(bank_summary_mutex);
     
     bank_summary.num_transactions = transaction_history.size();
     
@@ -183,21 +221,13 @@ void ServerDatabase::updateBankSummary() {
 
 /* Métodos Auxiliares */
 
-bool ServerDatabase::clientExists(const string& ip_address) const {
-    lock_guard<mutex> lock(client_table_mutex);
-    return client_table.find(ip_address) != client_table.end();
-}
-
 double ServerDatabase::getTotalBalance() const {
-    lock_guard<mutex> lock(client_table_mutex);
+    ReadGuard read_lock(client_table_lock);
+
     double total = 0.0;
     for (const auto& pair : client_table) {
         total += pair.second.balance;
     }
-    return total;
-}
 
-int ServerDatabase::getNextTransactionId() {
-    lock_guard<mutex> lock(transaction_id_mutex);
-    return next_transaction_id++;
+    return total;
 }

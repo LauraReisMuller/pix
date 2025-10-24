@@ -21,6 +21,7 @@ server: $(BUILD_DIR)
 	$(SRC_DIR)/server/processing.cpp \
 	$(SRC_DIR)/server/interface.cpp \
 	$(SRC_DIR)/server/database.cpp \
+	$(SRC_DIR)/server/locks.cpp \
 	$(SRC_DIR)/common/utils.cpp \
 	-o $(BUILD_DIR)/server.exe
 

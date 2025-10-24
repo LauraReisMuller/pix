@@ -5,6 +5,7 @@
 #include <iostream>
 #include "common/protocol.h"
 #include "common/utils.h"
+#include "server/locks.h"
 
 using namespace std;
 
@@ -37,19 +38,18 @@ class ServerDatabase {
 private:
     // Tabela de clientes (hash table)
     unordered_map<string, Client> client_table;
-    mutable mutex client_table_mutex;
+    mutable RWLock client_table_lock;
     
     // Histórico de transações
     vector<Transaction> transaction_history;
-    mutable mutex transaction_history_mutex;
+    mutable RWLock transaction_history_lock;
     
     // Resumo/estatísticas do banco
     BankSummary bank_summary;
     mutable mutex bank_summary_mutex;
 
     // Contador para gerar IDs únicos de transação
-    int next_transaction_id;
-    mutable mutex transaction_id_mutex;
+    atomic<int> next_transaction_id;
 
 public:
     ServerDatabase() : next_transaction_id(1) {}
@@ -66,6 +66,7 @@ public:
     int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount);
     vector<Transaction> getTransactionHistory() const;
     Transaction* getTransactionById(int tx_id);
+    bool validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const;
 
     // === Métodos para estatísticas do banco ===
     BankSummary getBankSummary() const;
