@@ -1,19 +1,66 @@
 #include "server/database.h"
+#include "server/interface.h"
 
 ServerDatabase server_db;  // Definição da instância global
 
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
     log_message("Entered makeTransaction");
-    // Atualizar número de req
-    bool updatedReq = updateClientLastReq(origin_ip, packet.seqn);
-    if (!updatedReq){log_message("Update Req error.");}
-    
-    // Atualizar saldos dos clientes, TEM QUE SER OPERAÇÃO ATÔMICA
-    updateClientBalance(origin_ip, -packet.req.value);
-    updateClientBalance(dest_ip, +packet.req.value);
+
+    // Garante que a aritmética em ponto flutuante assinado evite wraparound não assinado
+    double amount = static_cast<double>(packet.req.value);
+
+    // Valida antes de tocar nos saldos/histórico
+    if (!validateTransaction(origin_ip, dest_ip, amount)) {
+        log_message("Transaction validation failed. Aborting transaction.");
+        return false;
+    }
+
+    // Atualiza saldos dos clientes, TEM QUE SER OPERAÇÃO ATÔMICA
+    if(!updateClientBalance(origin_ip, -amount)) { log_message("Update origin client balance error."); }
+    if(!updateClientBalance(dest_ip,  amount)) { log_message("Update destination client balance error."); }
     log_message("Updated balances");
-    addTransaction(origin_ip, packet.seqn, dest_ip, packet.req.value);
+
+    addTransaction(origin_ip, packet.seqn, dest_ip, amount);
+
     updateBankSummary();
+    
+    // Atualiza número de req
+    if(!updateClientLastReq(origin_ip, packet.seqn)) {log_message("Update Req error.");}
+
+    // Print BankSummary after a successful transaction
+    BankSummary summary = getBankSummary();
+    string log_message = " num transactions " + std::to_string(summary.num_transactions) + 
+                         " total transferred " + std::to_string(summary.total_transferred) + 
+                         " total balance " + std::to_string(summary.total_balance);
+    server_interface.notifyUpdate(log_message);
+
+    return true;
+}
+
+bool ServerDatabase::validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const {
+    if (amount <= 0.0) {
+        log_message("validateTransaction: invalid amount (<= 0).");
+        return false;
+    }
+
+    lock_guard<mutex> lock(client_table_mutex);
+    auto it_orig = client_table.find(origin_ip);
+    if (it_orig == client_table.end()) {
+        log_message("validateTransaction: origin client not found.");
+        return false;
+    }
+
+    auto it_dest = client_table.find(dest_ip);
+    if (it_dest == client_table.end()) {
+        log_message("validateTransaction: destination client not found.");
+        return false;
+    }
+
+    if (it_orig->second.balance < amount) {
+        log_message("validateTransaction: insufficient funds in origin account.");
+        return false;
+    }
+
     return true;
 }
 

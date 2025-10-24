@@ -25,14 +25,14 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
                  " | Value: " + to_string(packet.req.value);
     log_message(msg.c_str());
 
-    //server_db.makeTransaction(client_ip, dest_ip, packet);
+    server_db.makeTransaction(client_ip, dest_ip, packet);
 
     // Prepara o pacote de ACK
     Packet ack_packet;
     ack_packet.type = PKT_REQUEST_ACK;
     ack_packet.seqn = packet.seqn;  // Mesmo número de sequência da requisição
     ack_packet.ack.seqn = packet.seqn;
-    ack_packet.ack.new_balance = 1000;  // Saldo fictício para teste
+    ack_packet.ack.new_balance = server_db.getClient(client_ip)->balance;  // Saldo fictício para teste
 
     // Envia o ACK de volta para o cliente usando o socket externo
     ssize_t sent_bytes = sendto(sockfd, &ack_packet, sizeof(Packet), 0,
