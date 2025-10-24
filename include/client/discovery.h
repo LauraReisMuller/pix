@@ -2,6 +2,13 @@
 #ifndef CLIENT_DISCOVERY_H
 #define CLIENT_DISCOVERY_H
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#include <iostream>
 #include <string>
 #include <netinet/in.h>
 

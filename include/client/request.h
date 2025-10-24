@@ -3,27 +3,43 @@
 #define CLIENT_REQUEST_H
 
 #include "common/protocol.h"
-#include "client/interface.h"
 #include <string>
 #include <mutex>
 #include <queue>
 #include <netinet/in.h>
+#include <atomic>
+#include <condition_variable>
+#include <functional>
+
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <tuple>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+
+using namespace std;
+
+class ClientInterface;
 
 //Definir o handler de comandos para ser usado na Interface. Esta função será o callback que a thread de input chama.
-using CommandHandler = std::function<void(const std::string& dest_ip, uint32_t value)>;
+using CommandHandler = function<void(const string& dest_ip, uint32_t value)>;
 
 class ClientRequest{
 
 public:
 
     //Construtor inicializa com o IP do servidor (descoberto) 
-    ClientRequest(const std::string& server_ip, int port);
+    ClientRequest(const string& server_ip, int port);
     ~ClientRequest();
 
     void setInterface(ClientInterface* interface);
     
     //Funcao chamada pela thread de input da Interface
-    void enqueueCommand(const std::string& dest_ip, uint32_t value);
+    void enqueueCommand(const string& dest_ip, uint32_t value);
     
     //Loop principal de envio (com lógica bloqueante)
     void runProcessingLoop();
@@ -32,17 +48,17 @@ public:
 private:
 
     //Variáveis de estado
-    std::string _server_ip;
+    string _server_ip;
     int _server_port;
     int _sockfd;
     struct sockaddr_in _server_addr;
     uint32_t _next_seqn; //Proximo ID a ser usado (comeca em 1)
     
     //Sincronizacao e fila 
-    std::queue<std::tuple<std::string, uint32_t>> _command_queue; //Fila de comandos do usuário
-    std::mutex _queue_mutex;
-    std::condition_variable _queue_cv;
-    std::atomic<bool> _running = true;
+    queue<tuple<string, uint32_t>> _command_queue; //Fila de comandos do usuário
+    mutex _queue_mutex;
+    condition_variable _queue_cv;
+    atomic<bool> _running = true;
 
     //Referencia à interface para notificar a thread de saída
     ClientInterface* _interface;

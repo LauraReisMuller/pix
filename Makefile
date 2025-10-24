@@ -20,7 +20,7 @@ server: $(BUILD_DIR)
 	$(SRC_DIR)/server/discovery.cpp \
 	$(SRC_DIR)/server/processing.cpp \
 	$(SRC_DIR)/server/interface.cpp \
-	$(SRC_DIR)/server/databases.cpp \
+	$(SRC_DIR)/server/database.cpp \
 	$(SRC_DIR)/common/utils.cpp \
 	-o $(BUILD_DIR)/server.exe
 

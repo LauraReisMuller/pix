@@ -1,8 +1,25 @@
-#include "server/databases.h"
+#include "server/database.h"
 
 ServerDatabase server_db;  // Definição da instância global
 
-// addClient: Método Escrita na tabela cliente
+bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
+    log_message("Entered makeTransaction");
+    // Atualizar número de req
+    bool updatedReq = updateClientLastReq(origin_ip, packet.seqn);
+    if (!updatedReq){log_message("Update Req error.");}
+    
+    // Atualizar saldos dos clientes, TEM QUE SER OPERAÇÃO ATÔMICA
+    updateClientBalance(origin_ip, -packet.req.value);
+    updateClientBalance(dest_ip, +packet.req.value);
+    log_message("Updated balances");
+    addTransaction(origin_ip, packet.seqn, dest_ip, packet.req.value);
+    updateBankSummary();
+    return true;
+}
+
+/* Tabela de clientes */
+
+// Escrita
 bool ServerDatabase::addClient(const string& ip_address) {
     lock_guard<mutex> lock(client_table_mutex);
 
@@ -14,7 +31,7 @@ bool ServerDatabase::addClient(const string& ip_address) {
     return true;
 }
 
-// getClient: Método Leitura na tabela cliente
+// Leitura
 Client* ServerDatabase::getClient(const string& ip_address) {
     lock_guard<mutex> lock(client_table_mutex);
     auto it = client_table.find(ip_address);
@@ -28,7 +45,7 @@ Client* ServerDatabase::getClient(const string& ip_address) {
     return nullptr;
 }
 
-// updateClientLastReq: Escrita na tabela cliente
+// Escrita
 bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
     lock_guard<mutex> lock(client_table_mutex);
     auto it = client_table.find(ip_address);
@@ -39,17 +56,18 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
     return false;
 }
 
-// updateClientBalance
-bool ServerDatabase::updateClientBalance(const string& ip_address, double new_balance) {
+// Escrita
+bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
     lock_guard<mutex> lock(client_table_mutex);
     auto it = client_table.find(ip_address);
     if (it != client_table.end()) {
-        it->second.balance = new_balance;
+        it->second.balance += transaction_value;
         return true;
     }
     return false;
 }
 
+// Leitura
 vector<Client> ServerDatabase::getAllClients() const {
     lock_guard<mutex> lock(client_table_mutex);
     vector<Client> clients;
@@ -59,17 +77,23 @@ vector<Client> ServerDatabase::getAllClients() const {
     return clients;
 }
 
-int ServerDatabase::addTransaction(int tx_id, const string& origin_ip, int req_id, const string& destination_ip, double amount) {
+/* Tabela de transações */
+
+// Escrita
+int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
+    int tx_id = getNextTransactionId();
     lock_guard<mutex> lock(transaction_history_mutex);
     transaction_history.emplace_back(tx_id, origin_ip, req_id, destination_ip, amount);
     return tx_id;
 }
 
+// Leitura
 vector<Transaction> ServerDatabase::getTransactionHistory() const {
     lock_guard<mutex> lock(transaction_history_mutex);
     return transaction_history;
 }
 
+// Leitura
 Transaction* ServerDatabase::getTransactionById(int tx_id) {
     lock_guard<mutex> lock(transaction_history_mutex);
     for (auto& tx : transaction_history) {
@@ -80,11 +104,15 @@ Transaction* ServerDatabase::getTransactionById(int tx_id) {
     return nullptr;
 }
 
+/* Tabela de Resumo Bancário */
+
+// Leitura
 BankSummary ServerDatabase::getBankSummary() const {
     lock_guard<mutex> lock(bank_summary_mutex);
     return bank_summary;
 }
 
+// Escrita
 void ServerDatabase::updateBankSummary() {
     lock_guard<mutex> lock1(bank_summary_mutex);
     lock_guard<mutex> lock2(transaction_history_mutex);
@@ -105,7 +133,9 @@ void ServerDatabase::updateBankSummary() {
     bank_summary.total_balance = balance_sum;
 }
 
-// Métodos Auxiliares
+
+/* Métodos Auxiliares */
+
 bool ServerDatabase::clientExists(const string& ip_address) const {
     lock_guard<mutex> lock(client_table_mutex);
     return client_table.find(ip_address) != client_table.end();

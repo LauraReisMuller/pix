@@ -19,7 +19,7 @@ string get_timestamp_str();
 // Loga uma mensagem no console com timestamp.
 void log_message(const char *msg);
 
-uint32_t ipToUint32(const std::string& ip_str);
+uint32_t ipToUint32(const string& ip_str);
 
 string uint32ToIp(uint32_t ip_int);
 

@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include "common/protocol.h"
+#include "common/utils.h"
 
 using namespace std;
 
@@ -60,7 +62,8 @@ public:
     vector<Client> getAllClients() const;
     
     // === Métodos para gerenciar transações ===
-    int addTransaction(int next_transaction_id, const string& origin_ip, int req_id, const string& destination_ip, double amount);
+    bool makeTransaction(const string& origin_ip, const string& dest_ip, Packet request);
+    int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount);
     vector<Transaction> getTransactionHistory() const;
     Transaction* getTransactionById(int tx_id);
 

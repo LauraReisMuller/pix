@@ -1,13 +1,5 @@
-// interface.cpp
 #include "client/interface.h"
-#include "common/utils.h" 
 #include "client/request.h"
-#include <stdio.h>
-#include <iostream>
-
-#include <sstream>
-#include <chrono>
-#include <ctime>
 
 // Recebe e armazena a referência ao RequestManager
 ClientInterface::ClientInterface(ClientRequest& request_manager)
@@ -34,7 +26,7 @@ void ClientInterface::stop() {
     if (out_th_.joinable()) out_th_.join();
 }
 
-void ClientInterface::pushAck(const ClientAck& ack) {
+void ClientInterface::pushAck(const AckData& ack) {
     {
         lock_guard<mutex> lk(m_);
         acks_.push(ack);
@@ -43,18 +35,7 @@ void ClientInterface::pushAck(const ClientAck& ack) {
 }
 
 void ClientInterface::displayDiscoverySuccess(const string& server_ip) {
-    cout << nowTimestamp() << " server_addr " << server_ip << endl;
-}
-
-string ClientInterface::nowTimestamp() const {
-    using namespace chrono;
-    auto tp = system_clock::now();
-    time_t t = system_clock::to_time_t(tp);
-    tm tm{};
-    localtime_r(&t, &tm);
-    char buf[32];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
-    return buf;
+    cout << get_timestamp_str() << " discovery ok server " << server_ip << endl;
 }
 
 // Thread de input fica em loop lendo comandos do cliente no terminal.
@@ -93,11 +74,11 @@ void ClientInterface::outputLoop() {
             auto ack = acks_.front(); acks_.pop();
             lk.unlock();
 
-            cout << nowTimestamp()
-                      << " server " << ack.server_ip
+            cout << get_timestamp_str()
+                      //<< " server " << ack.server_ip
                       << " id req " << ack.seqn
-                      << " dest " << ack.dest_ip
-                      << " value " << ack.value
+                      //<< " dest " << ack.dest_ip
+                      //<< " value " << ack.value
                       << " new balance " << ack.new_balance
                       << endl;
 

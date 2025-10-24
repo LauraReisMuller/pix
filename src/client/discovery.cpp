@@ -1,14 +1,6 @@
 #include "client/discovery.h"
 #include "common/protocol.h"
 #include "common/utils.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <string.h>
-#include <iostream>
-
 
 #define DISCOVERY_TIMEOUT_SEC 1
 #define MAX_DISCOVERY_ATTEMPTS 5
@@ -36,7 +28,7 @@ void ClientDiscovery::setupSocket() {
     _sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (_sockfd < 0) {
         log_message("ERROR opening client socket");
-        throw std::runtime_error("Failed to open socket.");
+        throw runtime_error("Failed to open socket.");
     }
     
     // Habilita a opção SO_BROADCAST no socket
@@ -44,7 +36,7 @@ void ClientDiscovery::setupSocket() {
     if (setsockopt(_sockfd, SOL_SOCKET, SO_BROADCAST, &enable, sizeof(enable)) < 0) {
         log_message("ERROR setting SO_BROADCAST option");
         close(_sockfd);
-        throw std::runtime_error("Failed to set SO_BROADCAST.");
+        throw runtime_error("Failed to set SO_BROADCAST.");
     }
     log_message("Client socket created and SO_BROADCAST enabled.");
 }
@@ -108,11 +100,11 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
  * @brief Realiza o processo de Descoberta.
  * @return O endereço IP do servidor descoberto, ou uma string vazia em caso de falha.
  */
-std::string ClientDiscovery::discoverServer() {
+string ClientDiscovery::discoverServer() {
     
     try {
         setupSocket();
-    } catch (const std::runtime_error& e) {
+    } catch (const runtime_error& e) {
         return ""; 
     }
 
@@ -145,7 +137,7 @@ std::string ClientDiscovery::discoverServer() {
             
             // Fecha o socket e retorna o IP
             close(_sockfd);
-            return std::string(ip_str);
+            return string(ip_str);
         }
     }
 
