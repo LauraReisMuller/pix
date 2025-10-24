@@ -6,6 +6,7 @@
 #include "common/protocol.h"
 #include "common/utils.h"
 #include "server/locks.h"
+#include <atomic>
 
 using namespace std;
 
@@ -59,6 +60,7 @@ public:
     Client* getClient(const string& ip_address);
     bool updateClientLastReq(const string& ip_address, int req_number);
     bool updateClientBalance(const string& ip_address, double new_balance);
+    double getClientBalance(const std::string& ip_address);
     vector<Client> getAllClients() const;
     
     // === Métodos para gerenciar transações ===

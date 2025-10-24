@@ -101,16 +101,14 @@ bool ServerDatabase::addClient(const string& ip_address) {
 Client* ServerDatabase::getClient(const string& ip_address) {
     ReadGuard read_lock(client_table_lock);
 
-    bool clientExists = (client_table.find(ip_address) != client_table.end());
-
-    if (clientExists) {
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
         // Exibe informações do cliente
-        cout << "Client Key: " << client_table[ip_address].ip << endl; // Ip e porta do cliente.
-        cout << "Client Last_req: " << client_table[ip_address].last_req << endl;
-        cout << "Client Balance: " << client_table[ip_address].balance << endl;
-        return &(client_table[ip_address]);
+        cout << "Client Key: " << it->second.ip << endl; // Ip e porta do cliente.
+        cout << "Client Last_req: " << it->second.last_req << endl;
+        cout << "Client Balance: " << it->second.balance << endl;
+        return &(it->second);
     }
-
     return nullptr;
 }
 
@@ -118,10 +116,10 @@ Client* ServerDatabase::getClient(const string& ip_address) {
 bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
     WriteGuard write_lock(client_table_lock);
 
-    bool clientExists = (client_table.find(ip_address) != client_table.end());
+    auto it = client_table.find(ip_address);
 
-    if (clientExists) {
-        client_table[ip_address].last_req = req_number;
+    if (it != client_table.end()) {
+        it->second.last_req = req_number;
         return true;
     }
     return false;
@@ -131,10 +129,9 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
 bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
     WriteGuard write_lock(client_table_lock);
 
-    bool clientExists = (client_table.find(ip_address) != client_table.end());
-
-    if (clientExists) {
-        client_table[ip_address].balance += transaction_value;
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        it->second.balance += transaction_value;
         return true;
     }
     return false;
@@ -150,6 +147,20 @@ vector<Client> ServerDatabase::getAllClients() const {
     }
 
     return clients;
+}
+
+// Leitura 
+double ServerDatabase::getClientBalance(const string& ip_address) {
+    // NOTE: Se o seu amigo implementar o shared_mutex (Leitor/Escritor), 
+    // esta função usará um shared_lock (acesso de leitura).
+    ReadGuard read_lock(client_table_lock);
+    
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        return it->second.balance;
+    }
+    // Retorna um valor inválido se o cliente não for encontrado (protocolo: cliente não existe)
+    return -1.0; 
 }
 
 /* Tabela de transações */
