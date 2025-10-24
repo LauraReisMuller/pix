@@ -124,6 +124,20 @@ vector<Client> ServerDatabase::getAllClients() const {
     return clients;
 }
 
+// Leitura 
+double ServerDatabase::getClientBalance(const string& ip_address) {
+    // NOTE: Se o seu amigo implementar o shared_mutex (Leitor/Escritor), 
+    // esta função usará um shared_lock (acesso de leitura).
+    lock_guard<mutex> lock(client_table_mutex);
+    
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        return it->second.balance;
+    }
+    // Retorna um valor inválido se o cliente não for encontrado (protocolo: cliente não existe)
+    return -1.0; 
+}
+
 /* Tabela de transações */
 
 // Escrita

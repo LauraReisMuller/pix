@@ -59,6 +59,8 @@ public:
     Client* getClient(const string& ip_address);
     bool updateClientLastReq(const string& ip_address, int req_number);
     bool updateClientBalance(const string& ip_address, double new_balance);
+    bool validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const;
+    double getClientBalance(const std::string& ip_address);
     vector<Client> getAllClients() const;
     
     // === Métodos para gerenciar transações ===
