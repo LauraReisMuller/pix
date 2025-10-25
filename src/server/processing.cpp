@@ -102,11 +102,17 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     // --- 2. EXECUÇÃO (received_seqn == last_processed_seqn + 1) ---
     
     if (is_query) {
+        
         // CONSULTA DE SALDO (Não é transação)
         double balance_double = server_db.getClientBalance(origin_ip_str);
-        final_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
-        log_message(("Consulta de saldo OK. Saldo: " + to_string(final_balance)).c_str());
         
+        if (balance_double >= 0) {
+        final_balance = static_cast<uint32_t>(balance_double);
+        log_message(("Consulta de saldo OK. Saldo: " + to_string(final_balance)).c_str());
+
+        // ATUALIZAÇÃO NECESSÁRIA: Sinaliza que a requisição de consulta foi processada.
+        server_db.updateClientLastReq_unsafe(origin_ip_str, received_seqn); // CHAMA A VERSÃO _UNSAFE
+        }
     } else {
         // TRANSAÇÃO REAL (Chama o COMMIT ATÔMICO)
         
