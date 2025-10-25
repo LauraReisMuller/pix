@@ -1,4 +1,5 @@
 #include "server/discovery.h"
+#include "server/database.h"
 #include "server/processing.h"
 #include "common/utils.h"
 #include "common/protocol.h"
@@ -11,6 +12,10 @@
 #include <string.h>
 
 using namespace std;
+
+//apenas para o Cliente fake
+extern ServerDatabase server_db;
+
 
 /**
  * @brief Cria e configura um socket UDP para o servidor.
@@ -137,6 +142,16 @@ int main(int argc, char* argv[]) {
         // Cria instâncias dos handlers
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
+
+        /*CLIENTE FAKE PARA TESTE*/
+        const string FAKE_CLIENT_IP = "10.0.0.2";
+        
+        // Garanta que o cliente fake seja adicionado.
+        if (server_db.addClient(FAKE_CLIENT_IP)) {
+            log_message(("SUCCESS: Added fake client " + FAKE_CLIENT_IP + " for testing.").c_str());
+        } else {
+            log_message("WARNING: Fake client already existed or failed to add.");
+        }
 
         // Inicia o loop principal do servidor
         runServerLoop(sockfd, discovery_handler, processing_handler);
