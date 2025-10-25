@@ -7,6 +7,7 @@
 #include "common/utils.h"
 #include "server/locks.h"
 #include <atomic>
+#include <cstring>
 
 using namespace std;
 
@@ -15,6 +16,9 @@ struct Client {
     int last_req;      // Número da última requisição processada *no cliente*
     double balance;    // Saldo atual do cliente
 
+    //Armazena a última resposta enviada (para reenvio rápido em caso de duplicidade)
+    Packet last_ack_response;
+    
     Client(const string& client_ip) : ip(client_ip), last_req(0), balance(100.0) {}
 };
 
@@ -47,7 +51,7 @@ private:
     
     // Resumo/estatísticas do banco
     BankSummary bank_summary;
-    mutable mutex bank_summary_mutex;
+    mutable RWLock bank_summary_lock;
 
     // Contador para gerar IDs únicos de transação
     atomic<int> next_transaction_id;
@@ -59,13 +63,20 @@ public:
     bool addClient(const string& ip_address);
     Client* getClient(const string& ip_address);
     bool updateClientLastReq(const string& ip_address, int req_number);
+    bool updateClientLastReq_unsafe(const string& ip_address, int req_number);
     bool updateClientBalance(const string& ip_address, double new_balance);
+    bool updateClientBalance_unsafe(const string& ip_address, double new_balance);
+    bool updateClientLastAck_unsafe(const string& ip_address, const Packet& ack);
+    Packet getClientLastAck(const string& ip_address);
     double getClientBalance(const std::string& ip_address);
+    double getClientBalance_unsafe(const std::string& ip_address);
+    uint32_t getClientLastReq(const std::string& ip_address);
     vector<Client> getAllClients() const;
     
     // === Métodos para gerenciar transações ===
     bool makeTransaction(const string& origin_ip, const string& dest_ip, Packet request);
     int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount);
+    int addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, double amount);
     vector<Transaction> getTransactionHistory() const;
     Transaction* getTransactionById(int tx_id);
     bool validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const;
@@ -73,6 +84,7 @@ public:
     // === Métodos para estatísticas do banco ===
     BankSummary getBankSummary() const;
     void updateBankSummary();
+    void updateBankSummary_unsafe();
     
     // === Métodos auxiliares ===
     bool clientExists(const string& ip_address) const;

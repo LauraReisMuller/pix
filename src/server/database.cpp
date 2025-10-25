@@ -6,49 +6,71 @@ ServerDatabase server_db;  // Definição da instância global
 /* === Transações === */
 
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
-    log_message("Entered makeTransaction");
+    log_message("Entered makeTransaction (Atomic Commit)");
 
-    // Garante que a aritmética em ponto flutuante assinado evite wraparound não assinado
     double amount = static_cast<double>(packet.req.value);
-
-    // Validação com READ lock
-    {
-        ReadGuard read_lock(client_table_lock);
-        
-        if (!validateTransaction(origin_ip, dest_ip, amount)) {
-            log_message("Transaction validation failed inside makeTransaction.");
-            return false;
-        }
-    }
-
-    // Modificação com WRITE lock
-    {
-        WriteGuard write_lock(client_table_lock);
-
-        if(!updateClientBalance(origin_ip, -amount)) { log_message("Update origin client balance error."); }
-        if(!updateClientBalance(dest_ip,  amount)) { log_message("Update destination client balance error."); }
-        log_message("Updated balances");
-    }
-
-
-    addTransaction(origin_ip, packet.seqn, dest_ip, amount);
-
-    updateBankSummary();
     
-    // Atualiza número de req
-    if(!updateClientLastReq(origin_ip, packet.seqn)) {log_message("Update Req error.");}
+    // --- 1. AQUISIÇÃO SIMULTÂNEA DOS LOCKS DE ESCRITA ---
+    // Este bloco garante que o COMMIT de débito/crédito/histórico é ATÔMICO.
+    WriteGuard client_lock(client_table_lock);
+    WriteGuard history_lock(transaction_history_lock);
+    WriteGuard summary_lock(bank_summary_lock); 
+    
+    // --- 2. VALIDAÇÃO ATÔMICA FINAL (INLINE, SOB O LOCK) ---
+    
+    auto it_orig = client_table.find(origin_ip);
+    auto it_dest = client_table.find(dest_ip);
 
-    // Print BankSummary after a successful transaction
-    BankSummary summary = getBankSummary();
-    string log_message = " num transactions " + to_string(summary.num_transactions) + 
+    // Validação
+    if (it_orig == client_table.end() || it_dest == client_table.end()) {
+        log_message("Transaction failed: Origin or Destination client not found.");
+        return false;
+    }
+    if (it_orig->second.balance < amount || amount <= 0.0) {
+        log_message("Transaction failed: Insufficient funds or invalid amount.");
+        return false;
+    }
+
+    // --- 3. COMMIT ATÔMICO (Usando lógica _UNSAFE/Inline) ---
+    
+    // a) Atualiza Saldos (Chama versão _UNSAFE)
+    updateClientBalance_unsafe(origin_ip, -amount);
+    updateClientBalance_unsafe(dest_ip, amount);
+    log_message("Updated balances"); 
+
+    // b) Atualiza Histórico (Chama versão _UNSAFE)
+    addTransaction_unsafe(origin_ip, packet.seqn, dest_ip, amount);
+    log_message("depois de addtransaction");
+
+    // c) Atualiza last_req (Chama versão _UNSAFE)
+    updateClientLastReq_unsafe(origin_ip, packet.seqn);
+
+    // d) Atualiza Resumo (Chama versão _UNSAFE)
+    updateBankSummary_unsafe();
+
+    // ATENÇÃO: Adicione o cálculo do final_balance AQUI, sob o lock!
+    double balance_double = getClientBalance_unsafe(origin_ip); // Supondo que você crie esta versão
+    
+    Packet final_ack;
+    final_ack.type = PKT_REQUEST_ACK;
+    final_ack.seqn = packet.seqn; 
+    final_ack.ack.new_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
+
+    updateClientLastAck_unsafe(origin_ip, final_ack);
+    
+    // --- 4. NOTIFICAÇÃO (APÓS A LIBERAÇÃO DOS LOCKS) ---
+    
+    // A chamada a getBankSummary aqui é segura, pois ela pega o ReadGuard.
+    BankSummary summary = getBankSummary(); 
+    string interface_msg = " num transactions " + to_string(summary.num_transactions) + 
                          " total transferred " + to_string(summary.total_transferred) + 
                          " total balance " + to_string(summary.total_balance);
-    server_interface.notifyUpdate(log_message);
+    server_interface.notifyUpdate(interface_msg);
 
     return true;
 }
 
-bool ServerDatabase::validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const {
+/*bool ServerDatabase::validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const {
     if (amount <= 0.0) {
         log_message("validateTransaction: invalid amount (<= 0).");
         return false;
@@ -74,7 +96,7 @@ bool ServerDatabase::validateTransaction(const string& origin_ip, const string& 
     }
 
     return true;
-}
+}*/
 
 /* === Tabela de Clientes === */
 
@@ -114,7 +136,18 @@ Client* ServerDatabase::getClient(const string& ip_address) {
 
 // Escrita
 bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
+
     WriteGuard write_lock(client_table_lock);
+    auto it = client_table.find(ip_address);
+
+    if (it != client_table.end()) {
+        it->second.last_req = req_number;
+        return true;
+    }
+    return false;
+}
+
+bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int req_number) {
 
     auto it = client_table.find(ip_address);
 
@@ -125,9 +158,20 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
     return false;
 }
 
+
 // Escrita
 bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
+
     WriteGuard write_lock(client_table_lock);
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        it->second.balance += transaction_value;
+        return true;
+    }
+    return false;
+}
+
+bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, double transaction_value) {
 
     auto it = client_table.find(ip_address);
     if (it != client_table.end()) {
@@ -135,6 +179,31 @@ bool ServerDatabase::updateClientBalance(const string& ip_address, double transa
         return true;
     }
     return false;
+}
+
+// Escrita
+bool ServerDatabase::updateClientLastAck_unsafe(const string& ip_address, const Packet& ack) {
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        it->second.last_ack_response = ack;
+        return true;
+    }
+    return false;
+}
+
+//Leitura
+// Leitura 
+Packet ServerDatabase::getClientLastAck(const string& ip_address) {
+    ReadGuard read_lock(client_table_lock);
+
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        return it->second.last_ack_response;
+    }
+    // Retorna um pacote vazio (ou um pacote de erro) se não for encontrado
+    Packet empty_ack;
+    memset(&empty_ack, 0, sizeof(Packet));
+    return empty_ack;
 }
 
 // Leitura
@@ -163,13 +232,42 @@ double ServerDatabase::getClientBalance(const string& ip_address) {
     return -1.0; 
 }
 
+double ServerDatabase::getClientBalance_unsafe(const string& ip_address) {
+    // NOTE: Se o seu amigo implementar o shared_mutex (Leitor/Escritor), 
+    // esta função usará um shared_lock (acesso de leitura).
+
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        return it->second.balance;
+    }
+    // Retorna um valor inválido se o cliente não for encontrado (protocolo: cliente não existe)
+    return -1.0; 
+}
+
+
+// Leitura
+uint32_t ServerDatabase::getClientLastReq(const string& ip_address) {
+    // Usa ReadGuard para leitura, permitindo alta concorrência.
+    ReadGuard read_lock(client_table_lock);
+
+    auto it = client_table.find(ip_address);
+    if (it != client_table.end()) {
+        return it->second.last_req;
+    }
+    
+    // Se o cliente existe (foi adicionado na Descoberta), mas o IP não foi encontrado
+    // (o que não deveria acontecer), ou se a tabela estiver sendo inicializada,
+    // retornamos 0 ou -1. Retornar 0 (o primeiro ID é 1) é mais seguro para o protocolo.
+    return 0;
+}
+
 /* Tabela de transações */
 
 // Escrita
 int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
     int tx_id = next_transaction_id.fetch_add(1);
-
     WriteGuard write_lock(transaction_history_lock);
+
     transaction_history.emplace_back(tx_id, origin_ip, req_id, destination_ip, amount);
 
 /*
@@ -182,6 +280,24 @@ int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const st
 */
     return tx_id;
 }
+
+
+int ServerDatabase::addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
+    int tx_id = next_transaction_id.fetch_add(1);
+
+    transaction_history.emplace_back(tx_id, origin_ip, req_id, destination_ip, amount);
+
+/*
+    // Atualiza estatísticas do banco
+    {
+        lock_guard<mutex> lock(bank_summary_mutex);
+        bank_summary.num_transactions++;
+        bank_summary.total_transferred += amount;
+    }
+*/
+    return tx_id;
+}
+
 
 // Leitura
 vector<Transaction> ServerDatabase::getTransactionHistory() const {
@@ -205,14 +321,31 @@ Transaction* ServerDatabase::getTransactionById(int tx_id) {
 
 // Leitura
 BankSummary ServerDatabase::getBankSummary() const {
-    lock_guard<mutex> lock(bank_summary_mutex);
+    ReadGuard read_lock(bank_summary_lock);
     return bank_summary;
 }
 
 // Escrita
 void ServerDatabase::updateBankSummary() {
-    ReadGuard read_lock(client_table_lock);
-    lock_guard<mutex> summary_lock(bank_summary_mutex);
+    
+    ReadGuard read_lock(client_table_lock); 
+    ReadGuard summary_lock(bank_summary_lock); 
+    bank_summary.num_transactions = transaction_history.size();
+    
+    double total = 0.0;
+    for (const auto& tx : transaction_history) {
+        total += tx.amount;
+    }
+    bank_summary.total_transferred = total;
+    
+    double balance_sum = 0.0;
+    for (const auto& pair : client_table) {
+        balance_sum += pair.second.balance;
+    }
+    bank_summary.total_balance = balance_sum;
+}
+
+void ServerDatabase::updateBankSummary_unsafe() {
     
     bank_summary.num_transactions = transaction_history.size();
     

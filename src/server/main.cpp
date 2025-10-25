@@ -72,13 +72,23 @@ void handlePacket(const Packet& packet,
                   ServerDiscovery& discovery_handler, 
                   ServerProcessing& processing_handler) {
     
+    //Criamos cópias dos dados de I/O para garantir que a thread não use dados antigos.
+    //pois o buffer 'received_packet' será sobrescrito rapidamente pelo runServerLoop.
+    Packet packet_copy = packet;
+    struct sockaddr_in client_addr_copy = client_addr;
+
     switch (packet.type) {
         case PKT_DISCOVER:
+
+            // Descoberta é rápida, pode ser tratada na thread principal (só registro e envio de ACK)
             discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
             break;
         
         case PKT_REQUEST:
-            processing_handler.handleRequest(packet, client_addr, clilen, sockfd);
+            //Processar transações em nova thread (uma thread por requisição)
+            std::thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
+                processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
+            }).detach(); 
             break;
         
         default:
