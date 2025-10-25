@@ -111,7 +111,7 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         log_message(("Consulta de saldo OK. Saldo: " + to_string(final_balance)).c_str());
 
         // ATUALIZAÇÃO NECESSÁRIA: Sinaliza que a requisição de consulta foi processada.
-        server_db.updateClientLastReq_unsafe(origin_ip_str, received_seqn); // CHAMA A VERSÃO _UNSAFE
+        server_db.updateClientLastReq(origin_ip_str, received_seqn); // CHAMA A VERSÃO _UNSAFE
         }
     } else {
         // TRANSAÇÃO REAL (Chama o COMMIT ATÔMICO)

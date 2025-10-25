@@ -5,8 +5,8 @@
 #include "common/utils.h"
 
 // Definicoes para o RRA (timeout/retry)
-#define RRA_TIMEOUT_MS 200
-#define MAX_RETRIES 5000
+#define RRA_TIMEOUT_MS 10
+#define MAX_RETRIES 20000
 
 /*---Construtor e Setup ---*/
 

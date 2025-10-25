@@ -25,11 +25,14 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
         // Validação
         if (it_orig == client_table.end() || it_dest == client_table.end()) {
             log_message("Transaction failed: Origin or Destination client not found.");
+            updateClientLastReq_unsafe(origin_ip, packet.seqn);
+            updateBankSummary_unsafe();
             return false;
         }
         if (it_orig->second.balance < amount || amount <= 0.0) {
             log_message("Transaction failed: Insufficient funds or invalid amount.");
             updateClientLastReq_unsafe(origin_ip, packet.seqn);
+            updateBankSummary_unsafe();
             return false;
         }
 
@@ -63,6 +66,9 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
     
     // --- 4. NOTIFICAÇÃO (APÓS A LIBERAÇÃO DOS LOCKS) ---
     
+    //TESTE! Simulacao de uma carga alta 
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
     // A chamada a getBankSummary aqui é segura, pois ela pega o ReadGuard.
     
     BankSummary summary = getBankSummary(); 

@@ -1,16 +1,15 @@
 #!/bin/bash
 # ================================================
-# Script para Cliente 1 (192.168.0.25)
-# EXECUÇÃO DETERMINÍSTICA (VALOR FIXO)
+# Script para Cliente 2 (Simulação Local - 127.0.0.1)
 # Inclui requisições de consulta de saldo (valor 0)
 # ================================================
 
-CLIENT_IP="192.168.0.25"
-DEST_IP="10.0.0.2"
+CLIENT_IP="127.0.0.1"
+DEST_IP="192.168.0.25"
 PORT=4000
 NUM_TRANSACTIONS=10
-FIXED_VALUE=5
-QUERY_PROB=0.2      # 20% das requisições serão consultas
+FIXED_VALUE=3
+QUERY_PROB=0.3      # 30% de chance de consulta
 BUILD_DIR="build"
 
 # Cores
@@ -21,8 +20,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo -e "${BLUE}=================================================${NC}"
-echo -e "${BLUE}   Cliente 1 - $CLIENT_IP${NC}"
-echo -e "${BLUE}   Enviando para: $DEST_IP (Valor Fixo: $FIXED_VALUE)${NC}"
+echo -e "${BLUE}   Cliente 2 - $CLIENT_IP (Concorrente Local)${NC}"
+echo -e "${BLUE}   Enviando para: $DEST_IP${NC}"
 echo -e "${BLUE}=================================================${NC}"
 
 if [ ! -f "$BUILD_DIR/client.exe" ]; then
@@ -33,7 +32,7 @@ fi
 
 pkill -f "client.exe" 2>/dev/null
 
-COMMANDS_FILE="/tmp/client1_commands.txt"
+COMMANDS_FILE="/tmp/client2_commands.txt"
 > $COMMANDS_FILE
 
 echo -e "\n${BLUE}Preparando $NUM_TRANSACTIONS operações...${NC}"
@@ -60,4 +59,4 @@ echo -e "${YELLOW}Pressione Ctrl+C para encerrar${NC}\n"
 
 echo -e "\n${BLUE}Encerrando...${NC}"
 rm -f $COMMANDS_FILE
-echo -e "${GREEN}✓ Cliente 1 finalizado${NC}"
+echo -e "${GREEN}✓ Cliente 2 finalizado${NC}"
