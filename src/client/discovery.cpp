@@ -3,7 +3,7 @@
 #include "common/utils.h"
 
 #define DISCOVERY_TIMEOUT_SEC 1
-#define MAX_DISCOVERY_ATTEMPTS 5
+#define MAX_DISCOVERY_ATTEMPTS 50
 
 
 /**
