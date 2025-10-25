@@ -132,4 +132,39 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     // --- 3. ENVIO DO ACK DE SUCESSO/EXECUÇÃO ---
     // Envia o ACK confirmando que o pacote recebido (REQ #N) foi processado.
     sendResponseAck(sockfd, client_addr, clilen, received_seqn, final_balance, origin_ip_str, is_query, false);
+
+    // === DEBUG: Estado atual do banco após a requisição ===
+    {
+        cout << "\n========== ESTADO ATUAL DO BANCO ==========\n";
+
+        // Tabela de Clientes
+        auto clients = server_db.getAllClients();
+        cout << "--- Clientes ---\n";
+        for (const auto& c : clients) {
+            cout << "IP: " << c.ip
+                << " | Last Req: " << c.last_req
+                << " | Balance: " << c.balance << endl;
+        }
+
+        // Histórico de Transações
+        auto txs = server_db.getTransactionHistory();
+        cout << "\n--- Histórico de Transações ---\n";
+        for (const auto& tx : txs) {
+            cout << "TX#" << tx.id
+                << " | Origem: " << tx.origin_ip
+                << " | Destino: " << tx.destination_ip
+                << " | Valor: " << tx.amount
+                << " | ReqID: " << tx.req_id << endl;
+        }
+
+        // Resumo Bancário
+        auto summary = server_db.getBankSummary();
+        cout << "\n--- Resumo Bancário ---\n";
+        cout << "Transações: " << summary.num_transactions
+            << " | Total Transferido: " << summary.total_transferred
+            << " | Saldo Total: " << summary.total_balance << endl;
+
+        cout << "===========================================\n\n";
+    }
+
 }
