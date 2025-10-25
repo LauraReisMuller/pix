@@ -12,60 +12,65 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
     
     // --- 1. AQUISIÇÃO SIMULTÂNEA DOS LOCKS DE ESCRITA ---
     // Este bloco garante que o COMMIT de débito/crédito/histórico é ATÔMICO.
-    WriteGuard client_lock(client_table_lock);
-    WriteGuard history_lock(transaction_history_lock);
-    WriteGuard summary_lock(bank_summary_lock); 
-    
-    // --- 2. VALIDAÇÃO ATÔMICA FINAL (INLINE, SOB O LOCK) ---
-    
-    auto it_orig = client_table.find(origin_ip);
-    auto it_dest = client_table.find(dest_ip);
+    {
+        WriteGuard client_lock(client_table_lock);
+        WriteGuard history_lock(transaction_history_lock);
+        WriteGuard summary_lock(bank_summary_lock); 
+        
+        // --- 2. VALIDAÇÃO ATÔMICA FINAL (INLINE, SOB O LOCK) ---
+        
+        auto it_orig = client_table.find(origin_ip);
+        auto it_dest = client_table.find(dest_ip);
 
-    // Validação
-    if (it_orig == client_table.end() || it_dest == client_table.end()) {
-        log_message("Transaction failed: Origin or Destination client not found.");
-        return false;
+        // Validação
+        if (it_orig == client_table.end() || it_dest == client_table.end()) {
+            log_message("Transaction failed: Origin or Destination client not found.");
+            return false;
+        }
+        if (it_orig->second.balance < amount || amount <= 0.0) {
+            log_message("Transaction failed: Insufficient funds or invalid amount.");
+            updateClientLastReq_unsafe(origin_ip, packet.seqn);
+            return false;
+        }
+
+        // --- 3. COMMIT ATÔMICO (Usando lógica _UNSAFE/Inline) ---
+        
+        // a) Atualiza Saldos (Chama versão _UNSAFE)
+        updateClientBalance_unsafe(origin_ip, -amount);
+        updateClientBalance_unsafe(dest_ip, amount);
+        log_message("Updated balances"); 
+
+        // b) Atualiza Histórico (Chama versão _UNSAFE)
+        addTransaction_unsafe(origin_ip, packet.seqn, dest_ip, amount);
+        log_message("depois de addtransaction");
+
+        // c) Atualiza last_req (Chama versão _UNSAFE)
+        updateClientLastReq_unsafe(origin_ip, packet.seqn);
+
+        // d) Atualiza Resumo (Chama versão _UNSAFE)
+        updateBankSummary_unsafe();
+
+        // ATENÇÃO: Adicione o cálculo do final_balance AQUI, sob o lock!
+        double balance_double = getClientBalance_unsafe(origin_ip); // Supondo que você crie esta versão
+        
+        Packet final_ack;
+        final_ack.type = PKT_REQUEST_ACK;
+        final_ack.seqn = packet.seqn; 
+        final_ack.ack.new_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
+
+        updateClientLastAck_unsafe(origin_ip, final_ack);
     }
-    if (it_orig->second.balance < amount || amount <= 0.0) {
-        log_message("Transaction failed: Insufficient funds or invalid amount.");
-        return false;
-    }
-
-    // --- 3. COMMIT ATÔMICO (Usando lógica _UNSAFE/Inline) ---
-    
-    // a) Atualiza Saldos (Chama versão _UNSAFE)
-    updateClientBalance_unsafe(origin_ip, -amount);
-    updateClientBalance_unsafe(dest_ip, amount);
-    log_message("Updated balances"); 
-
-    // b) Atualiza Histórico (Chama versão _UNSAFE)
-    addTransaction_unsafe(origin_ip, packet.seqn, dest_ip, amount);
-    log_message("depois de addtransaction");
-
-    // c) Atualiza last_req (Chama versão _UNSAFE)
-    updateClientLastReq_unsafe(origin_ip, packet.seqn);
-
-    // d) Atualiza Resumo (Chama versão _UNSAFE)
-    updateBankSummary_unsafe();
-
-    // ATENÇÃO: Adicione o cálculo do final_balance AQUI, sob o lock!
-    double balance_double = getClientBalance_unsafe(origin_ip); // Supondo que você crie esta versão
-    
-    Packet final_ack;
-    final_ack.type = PKT_REQUEST_ACK;
-    final_ack.seqn = packet.seqn; 
-    final_ack.ack.new_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
-
-    updateClientLastAck_unsafe(origin_ip, final_ack);
     
     // --- 4. NOTIFICAÇÃO (APÓS A LIBERAÇÃO DOS LOCKS) ---
     
     // A chamada a getBankSummary aqui é segura, pois ela pega o ReadGuard.
+    
     BankSummary summary = getBankSummary(); 
     string interface_msg = " num transactions " + to_string(summary.num_transactions) + 
                          " total transferred " + to_string(summary.total_transferred) + 
                          " total balance " + to_string(summary.total_balance);
     server_interface.notifyUpdate(interface_msg);
+    
 
     return true;
 }
