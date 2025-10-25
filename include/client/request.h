@@ -45,6 +45,8 @@ public:
     void runProcessingLoop();
     void stopProcessing();
 
+    bool isQueueEmpty() const;
+
 private:
 
     //Variáveis de estado
@@ -56,7 +58,7 @@ private:
     
     //Sincronizacao e fila 
     queue<tuple<string, uint32_t>> _command_queue; //Fila de comandos do usuário
-    mutex _queue_mutex;
+    mutable mutex _queue_mutex;
     condition_variable _queue_cv;
     atomic<bool> _running = true;
 

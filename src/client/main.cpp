@@ -66,10 +66,8 @@ int main(int argc, char* argv[]) {
     std::thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
 
     // Espera até que o usuário pressione CTRL+D ou CTRL+C.
-    while (global_running.load() && cin.good()) {
-
-        // O thread principal apenas pausa para não consumir CPU
-        this_thread::sleep_for(chrono::milliseconds(100));
+    while (global_running.load() && (cin.good() || !request_manager.isQueueEmpty())) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
     }
 
     // Sinaliza todas as threads para pararem
@@ -77,7 +75,9 @@ int main(int argc, char* argv[]) {
     request_manager.stopProcessing();
 
     client_interface.stop();
-    processing_thread.join();
+    if (processing_thread.joinable()) {
+        processing_thread.join();
+    }
 
     return EXIT_SUCCESS;
 }

@@ -76,6 +76,12 @@ void ClientRequest::enqueueCommand(const string &dest_ip, uint32_t value)
     _queue_cv.notify_one(); // Notifica a thread de processamento
 }
 
+bool ClientRequest::isQueueEmpty() const {
+    // Usa lock_guard para proteger a leitura do tamanho da fila
+    std::lock_guard<std::mutex> lk(_queue_mutex);
+    return _command_queue.empty();
+}
+
 /* Lógica bloqueante de envio (RRA) ---*/
 
 bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
