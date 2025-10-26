@@ -3,6 +3,22 @@
 ## Estrutura
 Este projeto implementa um sistema cliente-servidor para simulação de operações Pix, com threads para descoberta, processamento e interface.
 
+## Compilação
+
+Use o Makefile para compilar:
+
+```
+make clean
+make
+```
+
+Os executáveis serão gerados no diretório principal.
+
+## Execução
+
+- Para rodar o servidor: `servidor 4000`
+- Para rodar o cliente: `cliente 4000`
+
 ### Ideia principal
 
 - **Um servidor** central e **vários clientes** conectados via rede.
@@ -30,22 +46,6 @@ Este projeto implementa um sistema cliente-servidor para simulação de operaç�
 - `src/common/`: Definições comuns (protocolos, utilitários)
 - `src/server/`: Código do servidor (main, descoberta, processamento, interface)
 - `src/client/`: Código do cliente (main, descoberta, request, interface)
-
-## Compilação
-
-Use o Makefile para compilar:
-
-```
-make clean
-make
-```
-
-Os executáveis serão gerados em `build/`.
-
-## Execução
-
-- Para rodar o servidor: `build/server.exe`
-- Para rodar o cliente: `build/client.exe`
 
 ## Testes (scripts em `tests/`)
 
