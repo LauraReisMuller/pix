@@ -73,6 +73,7 @@ bool ServerDatabase::addClient(const string& ip_address) {
     }
 
     client_table.emplace(ip_address, Client(ip_address));
+
     return true;
 }
 
@@ -228,6 +229,7 @@ int ServerDatabase::addTransaction_unsafe(const string& origin_ip, int req_id, c
 // Leitura
 BankSummary ServerDatabase::getBankSummary() const {
     ReadGuard read_lock(bank_summary_lock);
+    
     return bank_summary;
 }
 
