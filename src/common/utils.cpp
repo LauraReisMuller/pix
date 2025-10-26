@@ -1,8 +1,5 @@
 #include "common/utils.h"
 
-// Mutex global para sincronizar impressões no console
-mutex cout_mutex;
-
 /* Funções utilitárias (timestamp, formatação de logs) */
 
 string get_timestamp_str() {

@@ -8,8 +8,7 @@
 #include "server/locks.h"
 #include <atomic>
 #include <cstring>
-#include <chrono>
-#include <thread>
+#define ERROR -1
 
 using namespace std;
 
@@ -63,35 +62,37 @@ public:
 
     // === Métodos para gerenciar clientes ===
     bool addClient(const string& ip_address);
+
     Client* getClient(const string& ip_address);
-    bool updateClientLastReq(const string& ip_address, int req_number);
-    bool updateClientLastReq_unsafe(const string& ip_address, int req_number);
+
+    double getClientBalance(const string& ip_address);
+    double getClientBalance_unsafe(const string& ip_address);
+
     bool updateClientBalance(const string& ip_address, double new_balance);
     bool updateClientBalance_unsafe(const string& ip_address, double new_balance);
-    bool updateClientLastAck_unsafe(const string& ip_address, const Packet& ack);
+
+    uint32_t getClientLastReq(const string& ip_address);
+
+    bool updateClientLastReq(const string& ip_address, int req_number);
+    bool updateClientLastReq_unsafe(const string& ip_address, int req_number);
+
     Packet getClientLastAck(const string& ip_address);
-    double getClientBalance(const std::string& ip_address);
-    double getClientBalance_unsafe(const std::string& ip_address);
-    uint32_t getClientLastReq(const std::string& ip_address);
-    vector<Client> getAllClients() const;
+    
+    bool updateClientLastAck_unsafe(const string& ip_address, const Packet& ack);
+
     
     // === Métodos para gerenciar transações ===
     bool makeTransaction(const string& origin_ip, const string& dest_ip, Packet request);
+
     int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount);
     int addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, double amount);
-    vector<Transaction> getTransactionHistory() const;
-    Transaction* getTransactionById(int tx_id);
-    bool validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const;
 
     // === Métodos para estatísticas do banco ===
     BankSummary getBankSummary() const;
-    void updateBankSummary();
     void updateBankSummary_unsafe();
     
     // === Métodos auxiliares ===
-    bool clientExists(const string& ip_address) const;
     double getTotalBalance() const;
-    int getNextTransactionId();
 };
 
 // Instância única do banco de dados do servidor
