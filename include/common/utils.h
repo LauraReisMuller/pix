@@ -13,10 +13,8 @@
 
 using namespace std;
 
-// Retorna o timestamp atual formatado como uma string.
 string get_timestamp_str();
 
-// Loga uma mensagem no console com timestamp.
 void log_message(const char *msg);
 
 uint32_t ipToUint32(const string& ip_str);

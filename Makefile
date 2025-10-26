@@ -1,5 +1,3 @@
-# Makefile para compilar o projeto Pix
-
 CXX = g++
 CXXFLAGS = -Wall -pthread -std=c++17 -Iinclude
 SRC_DIR = src

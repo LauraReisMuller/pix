@@ -10,7 +10,7 @@ DEST_IP="10.0.0.2"
 PORT=4000
 NUM_TRANSACTIONS=10
 FIXED_VALUE=5
-QUERY_PROB=0.2      # 20% das requisições serão consultas
+QUERY_PROB=0.2
 BUILD_DIR="build"
 
 # Cores

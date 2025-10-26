@@ -24,18 +24,14 @@ class ClientRequest;
 
 class ClientInterface {
 public:
-
-    // O construtor deve receber uma referência ao RequestManager para delegar comandos
     ClientInterface(ClientRequest& request_manager);
     ~ClientInterface();
 
     void start();
     void stop();
 
-    // Enfileira um ACK recebido para exibição
     void pushAck(const AckData& ack);
 
-    // Mensagem após descoberta
     void displayDiscoverySuccess(const string& server_ip);
 
 private:
@@ -47,8 +43,8 @@ private:
     queue<AckData> acks_;
     atomic<bool> running_{false};
 
-    void inputLoop();   // lê stdin
-    void outputLoop();  // imprime acks
+    void inputLoop();
+    void outputLoop();
 };
 
 #endif // CLIENT_INTERFACE_H

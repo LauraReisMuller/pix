@@ -1,3 +1,7 @@
+// Lida com pacotes de descoberta (PKT_DISCOVER) enviados pelos clientes.
+// Ao receber um DISCOVER, garante que o cliente existe no banco, atualiza
+// o sumário do banco e envia um PKT_DISCOVER_ACK em resposta.
+
 #include "server/discovery.h"
 #include "common/protocol.h"
 #include "server/database.h"
@@ -31,7 +35,6 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     
     server_db.updateBankSummary();
     
-    // Log após atualizar resumo
     BankSummary summary = server_db.getBankSummary();
     log_message(("Discovery: BankSummary updated - Total Balance: " + 
                 to_string(summary.total_balance) + 

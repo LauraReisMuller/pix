@@ -1,21 +1,28 @@
+/**
+ * Implementação da base de dados em memória do servidor.
+ *
+ * Fornece:
+ *  - tabela de clientes (saldo, último req/ack)
+ *  - histórico de transacções
+ *  - sumário do banco (num_transactions, total_transferred, total_balance)
+ *
+ * Sincronização:
+ *  - utiliza RWLock e guard objects (ReadGuard/WriteGuard)
+ *  - versões `_unsafe` assumem que a protecção necessária já está aplicada
+ */
+
 #include "server/database.h"
 #include "server/interface.h"
 
-ServerDatabase server_db;  // Definição da instância global
-
-/* === Transações === */
+ServerDatabase server_db; 
 
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
     double amount = static_cast<double>(packet.req.value);
     
-    // --- 1. AQUISIÇÃO SIMULTÂNEA DOS LOCKS DE ESCRITA ---
-    // Este bloco garante que o COMMIT de débito/crédito/histórico é ATÔMICO.
     {
         WriteGuard client_lock(client_table_lock);
         WriteGuard history_lock(transaction_history_lock);
         WriteGuard summary_lock(bank_summary_lock); 
-        
-        // --- 2. VALIDAÇÃO ATÔMICA FINAL (INLINE, SOB O LOCK) ---
         
         auto it_orig = client_table.find(origin_ip);
         auto it_dest = client_table.find(dest_ip);
@@ -24,7 +31,6 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
         bool enough_balance = (it_orig->second.balance >= amount);
         bool valid_amount = (amount > 0.0);
     
-        // Validação
         if (!clients_exist) {
             log_message("Transaction failed: Origin or Destination client not found.");
             updateClientLastReq_unsafe(origin_ip, packet.seqn);
@@ -37,8 +43,6 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
             updateBankSummary_unsafe();
             return false;
         }
-
-        // --- 3. COMMIT ATÔMICO (Usando lógica _UNSAFE/Inline) ---
         
         updateClientBalance_unsafe(origin_ip, -amount);
         updateClientBalance_unsafe(dest_ip, amount);
@@ -61,8 +65,6 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
     
     return true;
 }
-
-/* === Tabela de Clientes === */
 
 bool ServerDatabase::addClient(const string& ip_address) {
     WriteGuard write_lock(client_table_lock);
@@ -101,8 +103,6 @@ bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int re
     return false;
 }
 
-
-// Escrita
 bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
     WriteGuard write_lock(client_table_lock);
 
@@ -126,7 +126,6 @@ bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, double
     return false;
 }
 
-// Escrita
 bool ServerDatabase::updateClientLastAck_unsafe(const string& ip_address, const Packet& ack) {
     auto it = client_table.find(ip_address);
 
@@ -151,7 +150,6 @@ bool ServerDatabase::updateClientLastAck(const string& ip_address, const Packet&
     return false;
 }
 
-// Leitura 
 Packet ServerDatabase::getClientLastAck(const string& ip_address) {
     ReadGuard read_lock(client_table_lock);
     auto it = client_table.find(ip_address);
@@ -160,14 +158,12 @@ Packet ServerDatabase::getClientLastAck(const string& ip_address) {
         return it->second.last_ack_response;
     }
 
-    // Retorna um pacote vazio (ou um pacote de erro) se não for encontrado
     Packet empty_ack;
     memset(&empty_ack, 0, sizeof(Packet));
 
     return empty_ack;
 }
 
-// Leitura 
 double ServerDatabase::getClientBalance(const string& ip_address) {
     ReadGuard read_lock(client_table_lock);
     
@@ -188,25 +184,17 @@ double ServerDatabase::getClientBalance_unsafe(const string& ip_address) {
     return ERROR; 
 }
 
-
-// Leitura
 uint32_t ServerDatabase::getClientLastReq(const string& ip_address) {
-    // Usa ReadGuard para leitura, permitindo alta concorrência.
     ReadGuard read_lock(client_table_lock);
 
     auto it = client_table.find(ip_address);
     if (it != client_table.end()) {
         return it->second.last_req;
     }
-    
-    // Se o cliente existe (foi adicionado na Descoberta), mas o IP não foi encontrado
-    // (o que não deveria acontecer), ou se a tabela estiver sendo inicializada, retornamos 0.
+
     return 0;
 }
 
-/* Tabela de transações */
-
-// Escrita
 int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
     int tx_id = next_transaction_id.fetch_add(1);
     WriteGuard write_lock(transaction_history_lock);
@@ -225,16 +213,12 @@ int ServerDatabase::addTransaction_unsafe(const string& origin_ip, int req_id, c
     return tx_id;
 }
 
-/* Tabela de Resumo Bancário */
-
-// Leitura
 BankSummary ServerDatabase::getBankSummary() const {
     ReadGuard read_lock(bank_summary_lock);
     
     return bank_summary;
 }
 
-// Escrita / Leitura
 void ServerDatabase::updateBankSummary_unsafe() {
     bank_summary.num_transactions = transaction_history.size();
     
@@ -249,7 +233,6 @@ void ServerDatabase::updateBankSummary_unsafe() {
     }
 }
 
-// Escrita / Leitura
 void ServerDatabase::updateBankSummary() {
     ReadGuard transaction_lock(transaction_history_lock);
     ReadGuard client_lock(client_table_lock);
@@ -267,8 +250,6 @@ void ServerDatabase::updateBankSummary() {
         bank_summary.total_balance += pair.second.balance;
     }
 }
-
-/* Métodos Auxiliares */
 
 double ServerDatabase::getTotalBalance() const {
     ReadGuard read_lock(client_table_lock);

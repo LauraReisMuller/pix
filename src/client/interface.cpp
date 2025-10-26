@@ -1,15 +1,20 @@
+/**
+ * Implementação da interface de linha de comandos do cliente.
+ *
+ * Responsabilidades:
+ *  - ler entradas do utilizador (inputLoop) e enfileirar comandos para envio
+ *  - apresentar ACKs recebidos do servidor (outputLoop)
+ *  - gerir threads de input/output e sincronização entre elas
+ */
+
 #include "client/interface.h"
 #include "client/request.h"
 
-// Recebe e armazena a referência ao RequestManager
 ClientInterface::ClientInterface(ClientRequest& request_manager)
     : _request_manager(request_manager) {}
 
 ClientInterface::~ClientInterface() { stop(); }
 
-// Uma thread para input e outra para output:
-// Input aguarda mensagens e envia para fila;
-// Output processa mensagens de fila.
 void ClientInterface::start() {
     bool expected = false;
     if (!running_.compare_exchange_strong(expected, true)) return;
@@ -17,7 +22,6 @@ void ClientInterface::start() {
     out_th_ = thread(&ClientInterface::outputLoop, this);
 }
 
-// Para as threads de input e output desse cliente.
 void ClientInterface::stop() {
     if (!running_) return;
     running_ = false;
@@ -38,7 +42,6 @@ void ClientInterface::displayDiscoverySuccess(const string& server_ip) {
     cout << get_timestamp_str() << " server_addr " << server_ip << endl;
 }
 
-// Thread de input fica em loop lendo comandos do cliente no terminal.
 void ClientInterface::inputLoop() {
     using namespace std;
 
@@ -63,7 +66,6 @@ void ClientInterface::inputLoop() {
     }
 }
 
-// Thread de output fica em loop imprimindo dados da requisição assim que ack é recebido.
 void ClientInterface::outputLoop() {
     unique_lock<mutex> lk(m_);
 
@@ -74,7 +76,6 @@ void ClientInterface::outputLoop() {
             auto ack = acks_.front(); acks_.pop();
             lk.unlock();
 
-            // Converte endereços IP
             char server_ip[INET_ADDRSTRLEN];
             char dest_ip[INET_ADDRSTRLEN];
             struct in_addr server_addr;

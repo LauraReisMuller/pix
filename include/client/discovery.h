@@ -14,13 +14,11 @@
 
 class ClientDiscovery{
 public:
-
     ClientDiscovery(int port);
 
     std::string discoverServer();
 
 private:
-
     int _port;
     int _sockfd;
     struct sockaddr_in _serv_addr;

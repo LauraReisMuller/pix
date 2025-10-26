@@ -1,5 +1,3 @@
-#!/bin/bash
-# filepath: \\wsl.localhost\Ubuntu\home\gui\SisopII\Trabalho\pix\test.sh
 
 # ================================================
 # Script de Teste de Consistência PIX
@@ -265,7 +263,7 @@ if [ "$DUPLICATE_ACKS" -eq 0 ]; then
     ((TESTS_PASSED++))
 else
     echo -e "${YELLOW}⚠ WARNING${NC} ($DUPLICATE_ACKS duplicados detectados)"
-    ((TESTS_PASSED++))  # Não é erro crítico
+    ((TESTS_PASSED++))  
 fi
 
 # Teste 7: Saldo final esperado

@@ -9,7 +9,7 @@ DEST_IP="192.168.0.25"
 PORT=4000
 NUM_TRANSACTIONS=10
 FIXED_VALUE=3
-QUERY_PROB=0.3      # 30% de chance de consulta
+QUERY_PROB=0.3
 BUILD_DIR="build"
 
 # Cores
