@@ -7,6 +7,7 @@
 
 class ServerDiscovery {
 public:
+    void sendDiscoveryAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen);
 
     /**
      * @brief Processa o pacote de descoberta recebido usando um socket externo.

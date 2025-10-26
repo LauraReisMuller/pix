@@ -13,7 +13,6 @@
 
 class ServerProcessing {
 public:
-
     /**
      * @brief Processa uma requisição recebida e envia ACK de volta usando um socket externo.
      * @param packet Pacote recebido do cliente
