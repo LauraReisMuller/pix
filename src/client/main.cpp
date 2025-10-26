@@ -41,8 +41,6 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    cout << "Iniciando cliente na porta " << port << "..." << endl;
-
     //Iniciar a Fase de Descoberta
     ClientDiscovery client_disco(port);
     string server_ip = client_disco.discoverServer();
@@ -57,9 +55,6 @@ int main(int argc, char* argv[]) {
     request_manager.setInterface(&client_interface); 
     client_interface.start(); 
     client_interface.displayDiscoverySuccess(server_ip);
-    
-    // Simulação do loop principal (que será substituído pela lógica de multithreading)
-    cout << "O cliente está aguardando comandos (IP_DESTINO VALOR)..." << endl;
     
     // 4. Iniciar a Thread de Processamento de Requisições
     // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)

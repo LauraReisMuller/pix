@@ -1,4 +1,4 @@
-#!/bin/bash
+bin/bash
 # ================================================
 # Script para Cliente 1 (192.168.0.25)
 # EXECUÇÃO DETERMINÍSTICA (VALOR FIXO)

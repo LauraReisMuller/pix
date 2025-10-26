@@ -1,5 +1,6 @@
 #include "server/processing.h"
 #include "server/database.h"
+#include "server/interface.h"
 #include "common/protocol.h" 
 #include "common/utils.h"    
 #include <unistd.h>
@@ -10,7 +11,8 @@
 #include <cstring> // Para memset
 
 using namespace std;
-extern ServerDatabase server_db; 
+extern ServerDatabase server_db;
+extern ServerInterface server_interface; 
 
 // --- FUNÇÃO AUXILIAR DE ENVIO DE ACK ---
 // Integrada para evitar duplicação de código no envio
@@ -25,25 +27,9 @@ void sendResponseAck(int sockfd, const struct sockaddr_in& client_addr, socklen_
 
     ssize_t sent_bytes = sendto(sockfd, &ack_packet, sizeof(Packet), 0,
                                 (const struct sockaddr*)&client_addr, clilen);
-
-    // --- LOG FINAL (Integrado) ---
-    string status_log_part;
-    if (is_dup_oor) {
-        status_log_part = " (DUP/OOR - ACK ID " + to_string(seqn_to_send) + ")";
-    } else if (is_query) {
-        status_log_part = " (Consulta)";
-    } else {
-        status_log_part = (balance > 0 ? " (OK)" : " (Falha)");
-    }
-
-    string msg_final = "ACK sent to " + origin_ip + 
-                       " | ID: " + to_string(seqn_to_send) +
-                       " | New Balance: " + to_string(balance) + status_log_part;
                        
     if (sent_bytes < 0) {
         log_message(("ERROR sending ACK for ID " + to_string(seqn_to_send) + " to client.").c_str());
-    } else {
-        log_message(msg_final.c_str());
     }
 }
 
@@ -66,13 +52,6 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     inet_ntop(AF_INET, &dest_addr, dest_ip_str, INET_ADDRSTRLEN);
     string dest_ip_str_cpp(dest_ip_str);
     
-    // Log da requisição recebida
-    string msg_log = "Request received from " + origin_ip_str + 
-                     " | ID: " + to_string(packet.seqn) +
-                     " | Dest: " + dest_ip_str_cpp + 
-                     " | Value: " + to_string(packet.req.value);
-    log_message(msg_log.c_str());
-
     uint32_t final_balance = 0; 
     bool is_query = (packet.req.value == 0);
     
@@ -100,7 +79,6 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
 
 
     // --- 2. EXECUÇÃO (received_seqn == last_processed_seqn + 1) ---
-    
     if (is_query) {
         
         // CONSULTA DE SALDO (Não é transação)
@@ -108,23 +86,18 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         
         if (balance_double >= 0) {
         final_balance = static_cast<uint32_t>(balance_double);
-        log_message(("Consulta de saldo OK. Saldo: " + to_string(final_balance)).c_str());
-
         // ATUALIZAÇÃO NECESSÁRIA: Sinaliza que a requisição de consulta foi processada.
         server_db.updateClientLastReq(origin_ip_str, received_seqn); // CHAMA A VERSÃO _UNSAFE
         }
     } else {
         // TRANSAÇÃO REAL (Chama o COMMIT ATÔMICO)
-        
         bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
 
         // Recupera o saldo final para o ACK.
         double balance_double = server_db.getClientBalance(origin_ip_str);
         final_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
 
-        if (success) {
-            log_message("Transação concluída com sucesso.");
-        } else {
+        if (!success) {
             log_message("Transação recusada por saldo insuficiente ou erro de validação.");
         }
     }
@@ -133,7 +106,14 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     // Envia o ACK confirmando que o pacote recebido (REQ #N) foi processado.
     sendResponseAck(sockfd, client_addr, clilen, received_seqn, final_balance, origin_ip_str, is_query, false);
 
-    // === DEBUG: Estado atual do banco após a requisição ===
+    // --- 4. NOTIFICA A INTERFACE COM A MENSAGEM DE LOG ---
+    string msg_log = "client " + origin_ip_str + 
+                     " id_req " + to_string(packet.seqn) +
+                     " dest " + dest_ip_str_cpp + 
+                     " value " + to_string(packet.req.value);
+    server_interface.notifyUpdate(msg_log);
+
+    /* === DEBUG: Estado atual do banco após a requisição ===
     {
         cout << "\n========== ESTADO ATUAL DO BANCO ==========\n";
 
@@ -166,5 +146,5 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
 
         cout << "===========================================\n\n";
     }
-
+    */
 }

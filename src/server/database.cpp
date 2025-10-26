@@ -6,8 +6,6 @@ ServerDatabase server_db;  // Definição da instância global
 /* === Transações === */
 
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
-    log_message("Entered makeTransaction (Atomic Commit)");
-
     double amount = static_cast<double>(packet.req.value);
     
     // --- 1. AQUISIÇÃO SIMULTÂNEA DOS LOCKS DE ESCRITA ---
@@ -41,11 +39,9 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
         // a) Atualiza Saldos (Chama versão _UNSAFE)
         updateClientBalance_unsafe(origin_ip, -amount);
         updateClientBalance_unsafe(dest_ip, amount);
-        log_message("Updated balances"); 
 
         // b) Atualiza Histórico (Chama versão _UNSAFE)
         addTransaction_unsafe(origin_ip, packet.seqn, dest_ip, amount);
-        log_message("depois de addtransaction");
 
         // c) Atualiza last_req (Chama versão _UNSAFE)
         updateClientLastReq_unsafe(origin_ip, packet.seqn);
@@ -67,47 +63,9 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
     // --- 4. NOTIFICAÇÃO (APÓS A LIBERAÇÃO DOS LOCKS) ---
     
     //TESTE! Simulacao de uma carga alta 
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-
-    // A chamada a getBankSummary aqui é segura, pois ela pega o ReadGuard.
-    
-    BankSummary summary = getBankSummary(); 
-    string interface_msg = " num transactions " + to_string(summary.num_transactions) + 
-                         " total transferred " + to_string(summary.total_transferred) + 
-                         " total balance " + to_string(summary.total_balance);
-    server_interface.notifyUpdate(interface_msg);
-    
-
+    //std::this_thread::sleep_for(std::chrono::milliseconds(20));
     return true;
 }
-
-/*bool ServerDatabase::validateTransaction(const string& origin_ip, const string& dest_ip, double amount) const {
-    if (amount <= 0.0) {
-        log_message("validateTransaction: invalid amount (<= 0).");
-        return false;
-    }
-
-    ReadGuard read_lock(client_table_lock);
-    auto it_orig = client_table.find(origin_ip);
-
-    if (it_orig == client_table.end()) {
-        log_message("validateTransaction: origin client not found.");
-        return false;
-    }
-
-    auto it_dest = client_table.find(dest_ip);
-    if (it_dest == client_table.end()) {
-        log_message("validateTransaction: destination client not found.");
-        return false;
-    }
-
-    if (it_orig->second.balance < amount) {
-        log_message("validateTransaction: insufficient funds in origin account.");
-        return false;
-    }
-
-    return true;
-}*/
 
 /* === Tabela de Clientes === */
 
@@ -121,12 +79,6 @@ bool ServerDatabase::addClient(const string& ip_address) {
     }
 
     client_table.emplace(ip_address, Client(ip_address));
-/*
-    {
-        lock_guard<mutex> lock(bank_summary_mutex);
-        bank_summary.total_balance += 100.0;  // Saldo inicial do cliente
-    }
-*/
     return true;
 }
 
@@ -136,10 +88,6 @@ Client* ServerDatabase::getClient(const string& ip_address) {
 
     auto it = client_table.find(ip_address);
     if (it != client_table.end()) {
-        // Exibe informações do cliente
-        cout << "Client Key: " << it->second.ip << endl; // Ip e porta do cliente.
-        cout << "Client Last_req: " << it->second.last_req << endl;
-        cout << "Client Balance: " << it->second.balance << endl;
         return &(it->second);
     }
     return nullptr;

@@ -50,13 +50,10 @@ void ClientRequest::setupSocket()
         throw runtime_error("Failed to open request socket.");
     }
     // O cliente não precisa de bind, pois a porta de origem é aleatória (efêmera)
-    log_message("Request socket created.");
 }
 
 void ClientRequest::stopProcessing()
 {
-    log_message("RequestManager received stop signal. Stopping processing loop.");
-
     // Sinaliza a flag de parada
     _running = false;
     // Acorda a thread que está bloqueada em cv.wait()
@@ -71,7 +68,6 @@ void ClientRequest::enqueueCommand(const string &dest_ip, uint32_t value)
         // Esta função é chamada pela thread de input da interface
         lock_guard<mutex> lk(_queue_mutex);
         _command_queue.push({dest_ip, value});
-        log_message("Command enqueued. Notifying processing loop.");
     }
     _queue_cv.notify_one(); // Notifica a thread de processamento
 }
@@ -130,7 +126,6 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
         }
         else if (retval == 0)
         {
-            // timeout! O loop continua e reenvia a Requisição.
             log_message("ACK timeout. Retrying...");
             continue;
         }
@@ -153,15 +148,11 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
             // 4.Validação do ACK
             if (ack_packet.type == PKT_REQUEST_ACK && ack_packet.seqn == current_request.seqn)
             {
-
                 // Notificar a thread de output da interface
                 AckData ack_data;
                 ack_data.seqn = current_request.seqn;
                 ack_data.new_balance = ack_packet.ack.new_balance;
-
                 _interface->pushAck(ack_data);
-
-                log_message("ACK received and processed successfully.");
                 return true; // Sucesso: sai do laço de reenvio
             }
             else if (ack_packet.type == PKT_REQUEST_ACK && ack_packet.seqn < current_request.seqn)
@@ -180,14 +171,13 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
     }
 
     // Falha total: estourou o número máximo de tentativas
-    log_message("CRITICAL: Failed to receive ACK after maximum retries. Aborting command.");
+    log_message("Failed to receive ACK after maximum retries.");
     return false;
 }
 
 /*--- Loop Principal de Processamento ---*/
 void ClientRequest::runProcessingLoop()
 {
-
     while (_running)
     {
         unique_lock<mutex> lk(_queue_mutex);
@@ -220,7 +210,6 @@ void ClientRequest::runProcessingLoop()
             _next_seqn++;
         }
 
-        // Se falhar, o cliente ainda precisa usar o mesmo _next_seqn na próxima tentativa (que o usuário digitar),
-        // mas como a fila está vazia, ele esperará o próximo comando.
+        // Se falhar, o cliente ainda precisa usar o mesmo _next_seqn na próxima tentativa (que o usuário digitar), mas como a fila está vazia, ele esperará o próximo comando.
     }
 }

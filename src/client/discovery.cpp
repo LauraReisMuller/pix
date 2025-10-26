@@ -38,7 +38,6 @@ void ClientDiscovery::setupSocket() {
         close(_sockfd);
         throw runtime_error("Failed to set SO_BROADCAST.");
     }
-    log_message("Client socket created and SO_BROADCAST enabled.");
 }
 
 /**
@@ -89,9 +88,6 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
             log_message("ERROR on recvfrom during discovery");
             return false;
         }
-
-        // Verifica se recebeu algo
-        log_message("Server response received.");
         return true;
     }
 }
@@ -126,8 +122,7 @@ string ClientDiscovery::discoverServer() {
             log_message("ERROR sending discovery broadcast");
             continue; // Tenta novamente
         }
-        log_message("Discovery broadcast sent.");
-
+        
         // 2. Aguarda a resposta (ACK) unicast do servidor com timeout
         if (waitForResponse(server_info, len)) {
     

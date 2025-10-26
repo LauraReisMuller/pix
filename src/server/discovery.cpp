@@ -17,13 +17,11 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     string client_key = string(client_ip);
     server_db.addClient(client_key);
     
-    // Log de teste.
+    /* Log de teste.
     string log_msg = "Received DISCOVERY from client: " + string(client_ip);
     server_db.getClient(client_key);
-    
     log_message(log_msg.c_str());
-
-    //Resposta Unicast: Confirma o endereço do servidor para o cliente
+    */
     
     // Criar um pacote ACK/Resposta para Descoberta
     Packet discovery_ack;
@@ -35,8 +33,5 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     
     if (n < 0) {
         log_message("ERROR on sendto discovery ACK");
-    } else {
-        string ack_msg = "Sent ACK to discovered client: " + string(client_ip);
-        log_message(ack_msg.c_str());
     }
 }

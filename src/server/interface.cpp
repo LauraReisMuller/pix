@@ -1,6 +1,7 @@
 // interface.cpp
 #include "server/interface.h"
 #include "server/database.h"
+#include "common/utils.h"
 
 ServerInterface server_interface;
 
@@ -32,7 +33,7 @@ void ServerInterface::notifyUpdate(const string& logline) {
 }
 
 void ServerInterface::run() {
-    // Mensagem inicial com dados do BankSummary
+    // Mensagem inicial com dados do BankSummary (executada UMA vez na inicialização)
     {
         auto summary = server_db.getBankSummary();
         cout << get_timestamp_str()
@@ -58,10 +59,9 @@ void ServerInterface::run() {
             // Imprime resumo atualizado
             auto summary = server_db.getBankSummary();
             cout << "num transactions " << summary.num_transactions
-                      << " total transferred " << summary.total_transferred
-                      << " total balance " << summary.total_balance
-                      << endl;
-
+                    << " total transferred " << summary.total_transferred
+                    << " total balance " << summary.total_balance
+                    << endl;
             lk.lock();
         }
     }

@@ -1,6 +1,7 @@
 #include "server/discovery.h"
 #include "server/database.h"
 #include "server/processing.h"
+#include "server/interface.h"
 #include "common/utils.h"
 #include "common/protocol.h"
 #include <iostream>
@@ -15,6 +16,7 @@ using namespace std;
 
 //apenas para o Cliente fake
 extern ServerDatabase server_db;
+extern ServerInterface server_interface;
 
 
 /**
@@ -49,10 +51,6 @@ int setupServerSocket(int port) {
         close(sockfd);
         throw runtime_error("Failed to bind socket.");
     }
-
-    string msg = "Server listening on port " + to_string(port);
-    log_message(msg.c_str());
-
     return sockfd;
 }
 
@@ -149,6 +147,9 @@ int main(int argc, char* argv[]) {
         // Configura o socket do servidor
         int sockfd = setupServerSocket(port);
 
+        // Inicia a thread da interface (não-bloqueante)
+        server_interface.start();
+
         // Cria instâncias dos handlers
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
@@ -166,6 +167,8 @@ int main(int argc, char* argv[]) {
         // Inicia o loop principal do servidor
         runServerLoop(sockfd, discovery_handler, processing_handler);
 
+        // Para a interface ao encerrar
+        server_interface.stop();
         close(sockfd);
 
     } catch (const exception& e) {
