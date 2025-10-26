@@ -15,6 +15,9 @@ typedef struct{
 typedef struct {
     uint32_t seqn;        // Número de sequência (ID) que está sendo feito o ACK
     uint32_t new_balance; // Novo saldo do cliente origem
+    uint32_t dest_addr;   // IP do cliente destino
+    uint32_t value;       // Valor da transação
+    uint32_t server_addr;
 } AckData;
 
 typedef enum {

@@ -74,11 +74,25 @@ void ClientInterface::outputLoop() {
             auto ack = acks_.front(); acks_.pop();
             lk.unlock();
 
+            // Converte endereços IP
+            char server_ip[INET_ADDRSTRLEN];
+            char dest_ip[INET_ADDRSTRLEN];
+            struct in_addr server_addr;
+            server_addr.s_addr = ack.server_addr;
+            inet_ntop(AF_INET, &server_addr, server_ip, INET_ADDRSTRLEN);
+            if (ack.dest_addr != 0) {
+                struct in_addr dest_addr;
+                dest_addr.s_addr = ack.dest_addr;
+                inet_ntop(AF_INET, &dest_addr, dest_ip, INET_ADDRSTRLEN);
+            } else {
+                strcpy(dest_ip, "N/A");
+            }
+
             cout << get_timestamp_str()
-                      //<< " server " << ack.server_ip
+                      << " server " << server_ip
                       << " id req " << ack.seqn
-                      //<< " dest " << ack.dest_ip
-                      //<< " value " << ack.value
+                      << " dest " << dest_ip
+                      << " value " << ack.value
                       << " new balance " << ack.new_balance
                       << endl;
 

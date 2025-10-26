@@ -152,6 +152,9 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
                 AckData ack_data;
                 ack_data.seqn = current_request.seqn;
                 ack_data.new_balance = ack_packet.ack.new_balance;
+                ack_data.value = ack_packet.ack.value;
+                ack_data.dest_addr = ack_packet.ack.dest_addr;
+                ack_data.server_addr = _server_addr.sin_addr.s_addr;
                 _interface->pushAck(ack_data);
                 return true; // Sucesso: sai do laço de reenvio
             }
