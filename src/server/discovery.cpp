@@ -5,9 +5,7 @@
 
 void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen, int sockfd) {
     
-    //Verificar o tipo de pacote
     if (packet.type != PKT_DISCOVER) {
-        // Ignora pacotes que não sejam de descoberta neste listener (ex: REQ)
         return; 
     }
 
@@ -15,13 +13,26 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
     string client_key = string(client_ip);
-    server_db.addClient(client_key);
     
-    /* Log de teste.
-    string log_msg = "Received DISCOVERY from client: " + string(client_ip);
-    server_db.getClient(client_key);
-    log_message(log_msg.c_str());
-    */
+    // Log antes de adicionar
+    log_message(("Discovery: Attempting to add client: " + client_key).c_str());
+    
+    bool added = server_db.addClient(client_key);
+    
+    // Log do resultado
+    if (added) {
+        log_message(("Discovery: Client added successfully: " + client_key).c_str());
+    } else {
+        log_message(("Discovery: Client already exists: " + client_key).c_str());
+    }
+    
+    server_db.updateBankSummary();
+    
+    // Log após atualizar resumo
+    BankSummary summary = server_db.getBankSummary();
+    log_message(("Discovery: BankSummary updated - Total Balance: " + 
+                to_string(summary.total_balance) + 
+                ", Num Transactions: " + to_string(summary.num_transactions)).c_str());
     
     // Criar um pacote ACK/Resposta para Descoberta
     Packet discovery_ack;

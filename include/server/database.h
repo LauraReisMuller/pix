@@ -63,8 +63,6 @@ public:
     // === Métodos para gerenciar clientes ===
     bool addClient(const string& ip_address);
 
-    Client* getClient(const string& ip_address);
-
     double getClientBalance(const string& ip_address);
     double getClientBalance_unsafe(const string& ip_address);
 
@@ -90,6 +88,7 @@ public:
     // === Métodos para estatísticas do banco ===
     BankSummary getBankSummary() const;
     void updateBankSummary_unsafe();
+    void updateBankSummary();
     
     // === Métodos auxiliares ===
     double getTotalBalance() const;

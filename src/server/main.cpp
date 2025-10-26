@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
         
         // Garanta que o cliente fake seja adicionado.
         if (server_db.addClient(FAKE_CLIENT_IP)) {
-            log_message(("SUCCESS: Added fake client " + FAKE_CLIENT_IP + " for testing.").c_str());
+            log_message(("SUCCESS: Added fake client " + FAKE_CLIENT_IP + " for testing.\n").c_str());
         } else {
             log_message("WARNING: Fake client already existed or failed to add.");
         }

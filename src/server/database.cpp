@@ -77,18 +77,6 @@ bool ServerDatabase::addClient(const string& ip_address) {
     return true;
 }
 
-
-Client* ServerDatabase::getClient(const string& ip_address) {
-    ReadGuard read_lock(client_table_lock);
-
-    auto it = client_table.find(ip_address);
-    if (it != client_table.end()) {
-        return &(it->second);
-    }
-
-    return nullptr;
-}
-
 // Escrita
 bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
     WriteGuard write_lock(client_table_lock);
@@ -233,23 +221,39 @@ BankSummary ServerDatabase::getBankSummary() const {
     return bank_summary;
 }
 
-// Escrita
+// Escrita / Leitura
 void ServerDatabase::updateBankSummary_unsafe() {
     bank_summary.num_transactions = transaction_history.size();
     
-    double total = 0.0;
+    bank_summary.total_transferred = 0.0;
     for (const auto& tx : transaction_history) {
-        total += tx.amount;
+        bank_summary.total_transferred += tx.amount;
     }
-    bank_summary.total_transferred = total;
     
-    double balance_sum = 0.0;
+    bank_summary.total_balance = 0.0;
     for (const auto& pair : client_table) {
-        balance_sum += pair.second.balance;
+        bank_summary.total_balance += pair.second.balance;
     }
-    bank_summary.total_balance = balance_sum;
 }
 
+// Escrita / Leitura
+void ServerDatabase::updateBankSummary() {
+    ReadGuard transaction_lock(transaction_history_lock);
+    ReadGuard client_lock(client_table_lock);
+    WriteGuard summary_lock(bank_summary_lock);
+
+    bank_summary.num_transactions = transaction_history.size();
+    
+    bank_summary.total_transferred = 0.0;
+    for (const auto& tx : transaction_history) {
+        bank_summary.total_transferred += tx.amount;
+    }
+    
+    bank_summary.total_balance = 0.0;
+    for (const auto& pair : client_table) {
+        bank_summary.total_balance += pair.second.balance;
+    }
+}
 
 /* Métodos Auxiliares */
 
