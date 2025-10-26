@@ -138,6 +138,19 @@ bool ServerDatabase::updateClientLastAck_unsafe(const string& ip_address, const 
     return false;
 }
 
+bool ServerDatabase::updateClientLastAck(const string& ip_address, const Packet& ack) {
+    WriteGuard write_lock(client_table_lock);
+    
+    auto it = client_table.find(ip_address);
+
+    if (it != client_table.end()) {
+        it->second.last_ack_response = ack;
+        return true;
+    }
+
+    return false;
+}
+
 // Leitura 
 Packet ServerDatabase::getClientLastAck(const string& ip_address) {
     ReadGuard read_lock(client_table_lock);

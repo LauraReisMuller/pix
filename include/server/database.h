@@ -77,6 +77,7 @@ public:
     Packet getClientLastAck(const string& ip_address);
     
     bool updateClientLastAck_unsafe(const string& ip_address, const Packet& ack);
+    bool updateClientLastAck(const string& ip_address, const Packet& ack);
 
     
     // === Métodos para gerenciar transações ===

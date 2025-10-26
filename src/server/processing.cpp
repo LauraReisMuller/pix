@@ -100,7 +100,7 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
             query_ack.ack.new_balance = final_balance;
             query_ack.ack.dest_addr = packet.req.dest_addr;
             query_ack.ack.value = packet.req.value;
-            server_db.updateClientLastAck_unsafe(origin_ip_str, query_ack);
+            server_db.updateClientLastAck(origin_ip_str, query_ack);
         }
     } else {
         // Transação Real
