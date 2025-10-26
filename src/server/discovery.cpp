@@ -27,17 +27,7 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
 
     string client_key = string(client_ip);
     
-    // Log antes de adicionar
-    log_message(("Discovery: Attempting to add client: " + client_key).c_str());
-    
-    bool added = server_db.addClient(client_key);
-    
-    // Log do resultado
-    if (added) {
-        log_message(("Discovery: Client added successfully: " + client_key).c_str());
-    } else {
-        log_message(("Discovery: Client already exists: " + client_key).c_str());
-    }
+    server_db.addClient(client_key);
     
     server_db.updateBankSummary();
     

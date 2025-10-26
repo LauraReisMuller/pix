@@ -37,9 +37,9 @@ void ServerInterface::run() {
     {
         auto summary = server_db.getBankSummary();
         cout << get_timestamp_str()
-                  << " num transactions " << summary.num_transactions
-                  << " total transferred " << summary.total_transferred
-                  << " total balance " << summary.total_balance
+                  << " num_transactions " << summary.num_transactions
+                  << " total_transferred " << summary.total_transferred
+                  << " total_balance " << summary.total_balance
                   << endl;
     }
 
@@ -58,9 +58,9 @@ void ServerInterface::run() {
 
             // Imprime resumo atualizado
             auto summary = server_db.getBankSummary();
-            cout << "num transactions " << summary.num_transactions
-                    << " total transferred " << summary.total_transferred
-                    << " total balance " << summary.total_balance
+            cout << "num_transactions " << summary.num_transactions
+                    << " total_transferred " << summary.total_transferred
+                    << " total_balance " << summary.total_balance
                     << endl;
             lk.lock();
         }

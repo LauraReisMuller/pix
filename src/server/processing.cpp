@@ -62,8 +62,17 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     uint32_t received_seqn = packet.seqn;
     
     Packet buffered_ack;
-    if (received_seqn <= last_processed_seqn || received_seqn > last_processed_seqn + 1) {
-        // CENA 1 & 2: PACOTE DUPLICADO/ATRASADO (<= last_req) OU FORA DE ORDEM (> last_req + 1)
+    bool duplicate_packet = (received_seqn <= last_processed_seqn);
+    bool out_of_order_packet = (received_seqn > last_processed_seqn + 1);
+
+    if (duplicate_packet || out_of_order_packet) {
+        string log_prefix = duplicate_packet ? " DUP!!" : "";
+        string dup_msg = "client " + origin_ip_str + 
+                        log_prefix + 
+                        " id_req " + to_string(received_seqn) +
+                        " dest " + dest_ip_str_cpp + 
+                        " value " + to_string(packet.req.value);
+
         buffered_ack = server_db.getClientLastAck(origin_ip_str);
         
         // Verifica se o buffer está válido e aponta para o último processado
@@ -78,6 +87,10 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         // Envio do ACK: Usa o last_processed_seqn como ID de resposta
         sendResponseAck(sockfd, client_addr, clilen, last_processed_seqn, final_balance, 
                             origin_ip_str, buffered_ack.ack.dest_addr, buffered_ack.ack.value, is_query, true);
+
+        // Notifica a interface sobre o pacote duplicado/fora de ordem
+        server_interface.notifyUpdate(dup_msg);
+
         return;
     }
 

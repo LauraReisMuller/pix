@@ -90,10 +90,10 @@ void ClientInterface::outputLoop() {
 
             cout << get_timestamp_str()
                       << " server " << server_ip
-                      << " id req " << ack.seqn
+                      << " id_req " << ack.seqn
                       << " dest " << dest_ip
                       << " value " << ack.value
-                      << " new balance " << ack.new_balance
+                      << " new_balance " << ack.new_balance
                       << endl;
 
             lk.lock();
