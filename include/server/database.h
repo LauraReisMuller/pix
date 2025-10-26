@@ -8,8 +8,7 @@
 #include "server/locks.h"
 #include <atomic>
 #include <cstring>
-#include <chrono>
-#include <thread>
+#define ERROR -1
 
 using namespace std;
 
@@ -89,9 +88,7 @@ public:
     void updateBankSummary_unsafe();
     
     // === Métodos auxiliares ===
-    bool clientExists(const string& ip_address) const;
     double getTotalBalance() const;
-    int getNextTransactionId();
 };
 
 // Instância única do banco de dados do servidor

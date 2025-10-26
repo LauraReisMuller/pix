@@ -1,16 +1,11 @@
 #include "client/discovery.h"
 #include "client/interface.h"
 #include "client/request.h"
-#include "common/utils.h"
-
-#include <thread>
-#include <iostream>
-#include <string>
 #include <stdexcept>
-#include <cstdlib> 
 #include <csignal>
 
 using namespace std;
+using namespace chrono;
 
 //flag global de execucao para tratamento de sinal
 atomic<bool> global_running{true};
@@ -58,11 +53,11 @@ int main(int argc, char* argv[]) {
     
     // 4. Iniciar a Thread de Processamento de Requisições
     // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)
-    std::thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
+    thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
 
     // Espera até que o usuário pressione CTRL+D ou CTRL+C.
     while (global_running.load() && (cin.good() || !request_manager.isQueueEmpty())) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        this_thread::sleep_for(milliseconds(100)); 
     }
 
     // Sinaliza todas as threads para pararem

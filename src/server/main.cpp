@@ -4,20 +4,10 @@
 #include "server/interface.h"
 #include "common/utils.h"
 #include "common/protocol.h"
-#include <iostream>
 #include <stdexcept>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-#include <string.h>
 
 using namespace std;
-
-//apenas para o Cliente fake
-extern ServerDatabase server_db;
-extern ServerInterface server_interface;
-
 
 /**
  * @brief Cria e configura um socket UDP para o servidor.
@@ -84,7 +74,7 @@ void handlePacket(const Packet& packet,
         
         case PKT_REQUEST:
             //Processar transações em nova thread (uma thread por requisição)
-            std::thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
+            thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
                 processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
             }).detach(); 
             break;

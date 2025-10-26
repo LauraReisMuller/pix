@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <stdexcept>
 
+using namespace std;
+
 class RWLock {
 private:
     pthread_mutex_t _mutex;

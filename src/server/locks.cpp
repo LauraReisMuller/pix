@@ -6,9 +6,9 @@
 
 RWLock::RWLock() : _readers(0), _writers_waiting(0), _writer_active(false) {
     if (pthread_mutex_init(&_mutex, nullptr) != 0)
-        throw std::runtime_error("Failed to initialize mutex");
+        throw runtime_error("Failed to initialize mutex");
     if (pthread_cond_init(&_cond, nullptr) != 0)
-        throw std::runtime_error("Failed to initialize condition variable");
+        throw runtime_error("Failed to initialize condition variable");
 }
 
 RWLock::~RWLock() {
