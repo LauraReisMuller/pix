@@ -1,6 +1,7 @@
 # Makefile para compilar o projeto Pix
 
 CXX = g++
+# Adiciona -Iinclude para o compilador encontrar os headers
 CXXFLAGS = -Wall -pthread -std=c++17 -Iinclude
 SRC_DIR = src
 BUILD_DIR = build
@@ -8,6 +9,20 @@ BUILD_DIR = build
 # Portas padrão
 SERVER_PORT = 4000
 CLIENT_PORT = 4000
+
+# Variáveis para o Teste de Concorrência
+TEST_SRC = $(SRC_DIR)/server/concurrency_test.cpp
+TEST_EXE = $(BUILD_DIR)/concurrency_test.exe
+
+# Lista de todos os arquivos .cpp necessários para o link do Teste de Concorrência
+TEST_OBJS_DEPS = \
+    $(SRC_DIR)/server/database.cpp \
+    $(SRC_DIR)/common/utils.cpp \
+    $(SRC_DIR)/server/locks.cpp
+
+# ==============================================================================
+# TARGETS PRINCIPAIS
+# ==============================================================================
 
 all: $(BUILD_DIR) server client
 
@@ -34,7 +49,10 @@ client: $(BUILD_DIR)
 	$(SRC_DIR)/common/utils.cpp \
 	-o $(BUILD_DIR)/client.exe
 
-# Novos targets para executar
+# ==============================================================================
+# TARGETS DE EXECUÇÃO E TESTE DE REDE (Original)
+# ==============================================================================
+
 run-server: server
 	@echo "Iniciando servidor na porta $(SERVER_PORT)..."
 	./$(BUILD_DIR)/server.exe $(SERVER_PORT)
@@ -43,15 +61,9 @@ run-client: client
 	@echo "Iniciando cliente na porta $(CLIENT_PORT)..."
 	./$(BUILD_DIR)/client.exe $(CLIENT_PORT)
 
-# Target para rodar servidor em background
-start-server: server
-	@echo "Iniciando servidor em background na porta $(SERVER_PORT)..."
-	./$(BUILD_DIR)/server.exe $(SERVER_PORT) &
-	@echo "Servidor iniciado. PID: $$!"
-
-# Target para testar (roda servidor em background e depois o cliente)
+# Target para testar (mantido para testes de rede)
 test: server client
-	@echo "Iniciando teste completo..."
+	@echo "Iniciando teste completo de rede..."
 	@echo "Iniciando servidor em background..."
 	./$(BUILD_DIR)/server.exe $(SERVER_PORT) & \
 	SERVER_PID=$$!; \
@@ -61,36 +73,25 @@ test: server client
 	echo "Encerrando servidor..."; \
 	kill $$SERVER_PID 2>/dev/null || true
 
-# Targets to run individual test scripts in the tests/ folder
-run-tests-client:
-	@echo "Running tests/run_client.sh..."
-	bash tests/run_client.sh
+# ==============================================================================
+# TARGET DE TESTE DE THREAD SAFETY (CONCORRÊNCIA)
+# ==============================================================================
 
-run-tests-client2:
-	@echo "Running tests/run_client2.sh..."
-	bash tests/run_client2.sh
+# 1. Regra para compilar o executável de teste (build/concurrency_test.exe)
+$(TEST_EXE): $(TEST_SRC) $(TEST_OBJS_DEPS)
+	$(CXX) $(CXXFLAGS) \
+	$(TEST_SRC) \
+	$(TEST_OBJS_DEPS) \
+	-o $@
 
-run-tests-server:
-	@echo "Running tests/run_server.sh..."
-	bash tests/run_server.sh
+# 2. Regra para executar o teste de concorrência
+concurrency-test-db: $(TEST_EXE)
+	@echo "Rodando Teste de Atomicidade e Consistência (8 Threads)..."
+	./$(TEST_EXE)
 
-run-tests:
-	@echo "Running tests/test.sh..."
-	bash tests/test.sh
-
-# Target para verificar se os executáveis existem
-check:
-	@echo "Verificando executáveis..."
-	@if [ -f $(BUILD_DIR)/server.exe ]; then \
-		echo "✓ Server compilado"; \
-	else \
-		echo "✗ Server não encontrado"; \
-	fi
-	@if [ -f $(BUILD_DIR)/client.exe ]; then \
-		echo "✓ Client compilado"; \
-	else \
-		echo "✗ Client não encontrado"; \
-	fi
+# ==============================================================================
+# TARGETS DE LIMPEZA E UTILS
+# ==============================================================================
 
 clean:	
 	@echo "Limpando arquivos compilados..."
@@ -98,10 +99,8 @@ clean:
 	rmdir $(BUILD_DIR) 2>/dev/null || true
 	@echo "Limpeza concluída."
 
-# Target para matar processos do servidor (útil se ficou rodando)
 kill-server:
 	@echo "Procurando processos do servidor..."
 	@pkill -f "server.exe" || echo "Nenhum processo do servidor encontrado"
 
-.PHONY: all server client run-server run-client start-server test check help clean kill-server \
- 	run-tests-client run-tests-client2 run-tests-server run-tests
+.PHONY: all server client run-server run-client test clean kill-server concurrency-test-db
