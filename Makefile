@@ -61,6 +61,23 @@ test: server client
 	echo "Encerrando servidor..."; \
 	kill $$SERVER_PID 2>/dev/null || true
 
+# Targets to run individual test scripts in the tests/ folder
+run-tests-client:
+	@echo "Running tests/run_client.sh..."
+	bash tests/run_client.sh
+
+run-tests-client2:
+	@echo "Running tests/run_client2.sh..."
+	bash tests/run_client2.sh
+
+run-tests-server:
+	@echo "Running tests/run_server.sh..."
+	bash tests/run_server.sh
+
+run-tests:
+	@echo "Running tests/test.sh..."
+	bash tests/test.sh
+
 # Target para verificar se os executáveis existem
 check:
 	@echo "Verificando executáveis..."
@@ -86,4 +103,5 @@ kill-server:
 	@echo "Procurando processos do servidor..."
 	@pkill -f "server.exe" || echo "Nenhum processo do servidor encontrado"
 
-.PHONY: all server client run-server run-client start-server test check help clean kill-server
+.PHONY: all server client run-server run-client start-server test check help clean kill-server \
+ 	run-tests-client run-tests-client2 run-tests-server run-tests

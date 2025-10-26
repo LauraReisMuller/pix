@@ -47,11 +47,33 @@ Os executáveis serão gerados em `build/`.
 - Para rodar o servidor: `build/server.exe`
 - Para rodar o cliente: `build/client.exe`
 
+## Testes (scripts em `tests/`)
+
+Inclui scripts de teste no diretório `tests/` para facilitar execuções rápidas de clientes e servidor em cenários de teste.
+
+Alvos do `Makefile` adicionados para rodar os scripts sem precisar alterar permissões:
+
+- `make run-tests-server` — executa `tests/run_server.sh` (Inicia/usa o servidor de teste)
+- `make run-tests-client` — executa `tests/run_client.sh` (Cliente 1)
+- `make run-tests-client2` — executa `tests/run_client2.sh` (Cliente 2)
+
+- `make run-tests` — executa `tests/test.sh` (fluxo de teste completo)
+
+Exemplo de uso:
+
+```bash
+make run-tests-server
+make run-tests-client
+make run-tests-client2
+
+make run-tests
+```
+
 ## Dependências
 - g++
 - pthread (para threads)
 
-## Organização sugerida
+## Organização
 
 ```
 include/
