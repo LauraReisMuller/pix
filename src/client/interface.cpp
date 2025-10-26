@@ -35,7 +35,7 @@ void ClientInterface::pushAck(const AckData& ack) {
 }
 
 void ClientInterface::displayDiscoverySuccess(const string& server_ip) {
-    cout << get_timestamp_str() << " server addr " << server_ip << endl;
+    cout << get_timestamp_str() << " server_addr " << server_ip << endl;
 }
 
 // Thread de input fica em loop lendo comandos do cliente no terminal.

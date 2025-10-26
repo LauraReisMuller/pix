@@ -20,6 +20,35 @@ echo -e "${BLUE}=================================================${NC}"
 echo -e "${BLUE}   Servidor PIX - Porta $PORT${NC}"
 echo -e "${BLUE}=================================================${NC}"
 
+# Compilação
+echo -e "\n${CYAN} Compilando projeto...${NC}"
+
+if ! make clean > /dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ Warning: make clean falhou (ignorando)${NC}"
+fi
+
+echo -n "  • Compilando servidor... "
+if make server > /dev/null 2>&1; then
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}ERRO: Falha ao compilar servidor!${NC}"
+    make server
+    exit 1
+fi
+
+echo -n "  • Compilando cliente... "
+if make client > /dev/null 2>&1; then
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${RED}✗ FALHOU${NC}"
+    echo -e "${RED}ERRO: Falha ao compilar cliente!${NC}"
+    make client
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Compilação concluída com sucesso${NC}"
+
 # Verifica se o servidor está compilado
 if [ ! -f "$BUILD_DIR/server.exe" ]; then
     echo -e "${RED}ERRO: Servidor não compilado!${NC}"

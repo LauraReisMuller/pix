@@ -39,12 +39,12 @@ echo -e "\n${BLUE}Preparando $NUM_TRANSACTIONS operações...${NC}"
 
 for i in $(seq 1 $NUM_TRANSACTIONS); do
     if (( $(echo "$RANDOM/32767 < $QUERY_PROB" | bc -l) )); then
-        # 🧾 Consulta de saldo
+        # Consulta de saldo
         RAND_IP="10.0.0.$((RANDOM % 200 + 3))"
         echo "$RAND_IP 0" >> $COMMANDS_FILE
         echo -e "\r[${YELLOW}Consulta${NC}] $RAND_IP 0  ($i/$NUM_TRANSACTIONS)"
     else
-        # 💸 Transação normal
+        # Transação normal
         echo "$DEST_IP $FIXED_VALUE" >> $COMMANDS_FILE
         echo -e "\r[${GREEN}Transação${NC}] $DEST_IP $FIXED_VALUE  ($i/$NUM_TRANSACTIONS)"
     fi

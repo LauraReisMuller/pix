@@ -1,5 +1,6 @@
 
 build/
+test_logs/
 *.exe
 *.out
 *.bin
