@@ -3,11 +3,11 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-#include <cstdint> // Incluir para usar uint16_t, uint32_t
+#include <cstdint> 
 
 //Requisicao de transferencia
 typedef struct{
-    uint32_t dest_addr; // Endereço IP do cliente destino (em formato network order)
+    uint32_t dest_addr; // Endereço IP do cliente destino 
     uint32_t value;     // Valor da transferência
 }RequestData;
 
@@ -33,7 +33,7 @@ typedef struct {
     uint16_t type;    // Tipo do pacote (PKT_REQUEST, PKT_ACK, etc.)
     uint32_t seqn;    // Número de sequência da requisição (ID no cliente)
     
-    // Union permite que o pacote armazene diferentes estruturas no mesmo espaço
+    
     union {
         RequestData req;
         AckData ack;

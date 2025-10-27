@@ -28,9 +28,8 @@ public:
     RWLock& operator=(const RWLock&) = delete;
 };
 
-/**
- * @brief Guard RAII para leitura (permite múltiplos leitores simultâneos)
- */
+
+//Guard RAII para leitura (permite múltiplos leitores simultâneos)
 class ReadGuard {
 private:
     RWLock& _lock;
@@ -43,9 +42,7 @@ public:
     ReadGuard& operator=(const ReadGuard&) = delete;
 };
 
-/**
- * @brief Guard RAII para escrita (acesso exclusivo)
- */
+//Guard RAII para escrita (acesso exclusivo)
 class WriteGuard {
 private:
     RWLock& _lock;

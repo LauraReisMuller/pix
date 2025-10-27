@@ -6,10 +6,6 @@
 #define MAX_DISCOVERY_ATTEMPTS 50
 
 
-/**
- * @brief construtor da classe ClientDiscovery.
- * @param port a porta UDP onde o servidor está escutando.
- */
 ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
 
     // inicializa a estrutura de endereço do servidor para o broadcast
@@ -21,9 +17,8 @@ ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
     _serv_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); 
 }
 
-/**
- * @brief Cria o socket UDP e habilita a opção SO_BROADCAST.
- */
+
+//Cria o socket UDP e habilita a opção broadcast.
 void ClientDiscovery::setupSocket() {
     _sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (_sockfd < 0) {
@@ -40,12 +35,7 @@ void ClientDiscovery::setupSocket() {
     }
 }
 
-/**
- * @brief Espera pela resposta (ACK) do servidor com um timeout.
- * @param server_info Estrutura para armazenar o endereço do servidor que respondeu.
- * @param len Tamanho da estrutura server_info.
- * @return true se a resposta foi recebida dentro do timeout, false caso contrário.
- */
+//Espera pela resposta (ACK) do servidor com um timeout.
 bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) {
     fd_set read_fds;
     struct timeval tv;
@@ -92,10 +82,7 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
     }
 }
 
-/**
- * @brief Realiza o processo de Descoberta.
- * @return O endereço IP do servidor descoberto, ou uma string vazia em caso de falha.
- */
+//Realiza o processo de Descoberta.
 string ClientDiscovery::discoverServer() {
     
     try {

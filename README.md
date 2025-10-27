@@ -16,8 +16,8 @@ Os executáveis serão gerados no diretório principal.
 
 ## Execução
 
-- Para rodar o servidor: `servidor 4000`
-- Para rodar o cliente: `cliente 4000`
+- Para rodar o servidor: `./servidor.exe 4000`
+- Para rodar o cliente: `./cliente.exe 4000`
 
 ### Ideia principal
 
