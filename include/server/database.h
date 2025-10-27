@@ -60,8 +60,8 @@ public:
     uint32_t getClientBalance(const string& ip_address);
     uint32_t getClientBalance_unsafe(const string& ip_address);
 
-    bool updateClientBalance(const string& ip_address, uint32_t transaction_value);
-    bool updateClientBalance_unsafe(const string& ip_address, uint32_t transaction_value);
+    bool updateClientBalance(const string& ip_address, int32_t transaction_value);
+    bool updateClientBalance_unsafe(const string& ip_address, int32_t transaction_value);
 
     uint32_t getClientLastReq(const string& ip_address);
 

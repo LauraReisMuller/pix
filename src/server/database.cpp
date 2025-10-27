@@ -103,7 +103,7 @@ bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int re
     return false;
 }
 
-bool ServerDatabase::updateClientBalance(const string& ip_address, uint32_t transaction_value) {
+bool ServerDatabase::updateClientBalance(const string& ip_address, int32_t transaction_value) {
     WriteGuard write_lock(client_table_lock);
 
     auto it = client_table.find(ip_address);
@@ -115,7 +115,7 @@ bool ServerDatabase::updateClientBalance(const string& ip_address, uint32_t tran
     return false;
 }
 
-bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, uint32_t transaction_value) {
+bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, int32_t transaction_value) {
     auto it = client_table.find(ip_address);
 
     if (it != client_table.end()) {
