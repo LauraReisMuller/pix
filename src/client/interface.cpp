@@ -89,13 +89,14 @@ void ClientInterface::outputLoop() {
                 strcpy(dest_ip, "N/A");
             }
 
-            cout << get_timestamp_str()
-                      << " server " << server_ip
-                      << " id_req " << ack.seqn
-                      << " dest " << dest_ip
-                      << " value " << ack.value
-                      << " new_balance " << ack.new_balance
-                      << endl;
+            ostringstream oss;
+            oss << get_timestamp_str()
+                << " server " << server_ip
+                << " id_req " << ack.seqn
+                << " dest " << dest_ip
+                << " value " << ack.value
+                << " new_balance " << ack.new_balance;
+            cout << oss.str() << endl;
 
             lk.lock();
         }

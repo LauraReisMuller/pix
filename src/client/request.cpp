@@ -119,6 +119,7 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
         else
         {
             Packet ack_packet;
+            memset(&ack_packet, 0, sizeof(Packet));
             struct sockaddr_in from_addr;
             socklen_t from_len = sizeof(from_addr);
 
@@ -176,6 +177,7 @@ void ClientRequest::runProcessingLoop()
         lk.unlock();
 
         Packet request_packet;
+        memset(&request_packet, 0, sizeof(Packet));
         request_packet.type = PKT_REQUEST;
         request_packet.seqn = _next_seqn;
         request_packet.req.dest_addr = ipToUint32(dest_ip);

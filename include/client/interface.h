@@ -14,6 +14,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <sstream>
 
 #include "common/utils.h"
 #include "common/protocol.h"

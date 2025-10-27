@@ -55,14 +55,17 @@ void ServerInterface::run() {
             lk.unlock();
 
             if (!line.empty()) {
-                cout << get_timestamp_str() << " " << line << endl;
+                ostringstream oss;
+                oss << get_timestamp_str() << " " << line;
+                cout << oss.str() << endl;
             }
 
             auto summary = server_db.getBankSummary();
-            cout << "num_transactions " << summary.num_transactions
-                    << " total_transferred " << summary.total_transferred
-                    << " total_balance " << summary.total_balance
-                    << endl;
+            ostringstream summary_oss;
+            summary_oss << "num_transactions " << summary.num_transactions
+                       << " total_transferred " << summary.total_transferred
+                       << " total_balance " << summary.total_balance;
+            cout << summary_oss.str() << endl;
             lk.lock();
         }
     }

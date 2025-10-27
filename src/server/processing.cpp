@@ -28,6 +28,7 @@ void sendResponseAck(int sockfd, const struct sockaddr_in& client_addr, socklen_
                      uint32_t seqn_to_send, uint32_t balance, const string& origin_ip,  uint32_t dest_addr, uint32_t value, bool is_query, bool is_dup_oor) {
     
     Packet ack_packet;
+    memset(&ack_packet, 0, sizeof(Packet));
     ack_packet.type = PKT_REQUEST_ACK;
     ack_packet.seqn = seqn_to_send; 
     ack_packet.ack.new_balance = balance; 
@@ -62,6 +63,10 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     
     uint32_t final_balance = 0; 
     bool is_query = (packet.req.value == 0);
+
+    // DEBUG: Verifica o valor recebido
+    //log_message(("DEBUG: packet.req.value RAW = " + to_string(packet.req.value)).c_str());
+    //log_message(("DEBUG: packet.req.value ESPERADO = " + to_string(packet.req.value)).c_str());
 
     uint32_t last_processed_seqn = server_db.getClientLastReq(origin_ip_str);
     uint32_t received_seqn = packet.seqn;
