@@ -40,10 +40,10 @@ public:
     void displayDiscoverySuccess(const string& server_ip);
 
 private:
-    ClientRequest& _request_manager;
+    ClientRequest& request_manager_;
 
-    thread in_th_, out_th_;
-    mutex m_;
+    thread in_thread_, out_thread_;
+    mutex mutex_;
     condition_variable cv_;
     queue<AckData> acks_;
     atomic<bool> running_{false};

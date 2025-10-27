@@ -31,11 +31,5 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     
     server_db.updateBankSummary();
     
-    // Log após atualizar resumo
-    BankSummary summary = server_db.getBankSummary();
-    log_message(("Discovery: BankSummary updated - Total Balance: " + 
-                to_string(summary.total_balance) + 
-                ", Num Transactions: " + to_string(summary.num_transactions)).c_str());
-    
     sendDiscoveryAck(sockfd, client_addr, clilen);
 }

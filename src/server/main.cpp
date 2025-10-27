@@ -7,14 +7,6 @@
 #include <stdexcept>
 #include <unistd.h>
 
-using namespace std;
-
-/**
- * @brief Cria e configura um socket UDP para o servidor.
- * @param port Porta na qual o servidor irá escutar
- * @return File descriptor do socket criado
- * @throws runtime_error Se falhar ao criar ou fazer bind do socket
- */
 
 int setupServerSocket(int port) {
     // Cria um socket UDP
@@ -44,15 +36,7 @@ int setupServerSocket(int port) {
     return sockfd;
 }
 
-/**
- * @brief Processa um pacote recebido, delegando para o handler apropriado.
- * @param packet Pacote recebido
- * @param client_addr Endereço do cliente que enviou o pacote
- * @param clilen Tamanho da estrutura sockaddr_in
- * @param sockfd Socket para enviar respostas
- * @param discovery_handler Handler de descoberta
- * @param processing_handler Handler de processamento de requisições
- */
+
 void handlePacket(const Packet& packet, 
                   const struct sockaddr_in& client_addr, 
                   socklen_t clilen, 
@@ -85,12 +69,7 @@ void handlePacket(const Packet& packet,
     }
 }
 
-/**
- * @brief Loop principal do servidor que recebe e processa pacotes.
- * @param sockfd Socket do servidor
- * @param discovery_handler Handler de descoberta
- * @param processing_handler Handler de processamento de requisições
- */
+
 void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcessing& processing_handler) {
     Packet received_packet;
     struct sockaddr_in client_addr;
@@ -144,7 +123,8 @@ int main(int argc, char* argv[]) {
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
 
-        /*CLIENTE FAKE PARA TESTE*/
+/*
+        // CLIENTE FAKE PARA TESTE
         const string FAKE_CLIENT_IP = "10.0.0.2";
         
         // Garanta que o cliente fake seja adicionado.
@@ -153,7 +133,7 @@ int main(int argc, char* argv[]) {
         } else {
             log_message("WARNING: Fake client already existed or failed to add.");
         }
-
+*/
         // Inicia o loop principal do servidor
         runServerLoop(sockfd, discovery_handler, processing_handler);
 

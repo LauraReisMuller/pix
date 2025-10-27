@@ -3,7 +3,7 @@
 
 // Recebe e armazena a referência ao RequestManager
 ClientInterface::ClientInterface(ClientRequest& request_manager)
-    : _request_manager(request_manager) {}
+    : request_manager_(request_manager) {}
 
 ClientInterface::~ClientInterface() { stop(); }
 
@@ -13,8 +13,8 @@ ClientInterface::~ClientInterface() { stop(); }
 void ClientInterface::start() {
     bool expected = false;
     if (!running_.compare_exchange_strong(expected, true)) return;
-    in_th_ = thread(&ClientInterface::inputLoop, this);
-    out_th_ = thread(&ClientInterface::outputLoop, this);
+    in_thread_ = thread(&ClientInterface::inputLoop, this);
+    out_thread_ = thread(&ClientInterface::outputLoop, this);
 }
 
 // Para as threads de input e output desse cliente.
@@ -22,13 +22,13 @@ void ClientInterface::stop() {
     if (!running_) return;
     running_ = false;
     cv_.notify_all();
-    if (in_th_.joinable()) in_th_.join();
-    if (out_th_.joinable()) out_th_.join();
+    if (in_thread_.joinable()) in_thread_.join();
+    if (out_thread_.joinable()) out_thread_.join();
 }
 
 void ClientInterface::pushAck(const AckData& ack) {
     {
-        lock_guard<mutex> lk(m_);
+        lock_guard<mutex> lk(mutex_);
         acks_.push(ack);
     }
     cv_.notify_one();
@@ -40,8 +40,6 @@ void ClientInterface::displayDiscoverySuccess(const string& server_ip) {
 
 // Thread de input fica em loop lendo comandos do cliente no terminal.
 void ClientInterface::inputLoop() {
-    using namespace std;
-
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
 
@@ -59,27 +57,32 @@ void ClientInterface::inputLoop() {
             continue;
         }
 
-        _request_manager.enqueueCommand(dest_ip, value);
+        request_manager_.enqueueCommand(dest_ip, value);
     }
 }
 
 // Thread de output fica em loop imprimindo dados da requisição assim que ack é recebido.
 void ClientInterface::outputLoop() {
-    unique_lock<mutex> lk(m_);
+    unique_lock<mutex> lk(mutex_);
 
     while (running_) {
         cv_.wait(lk, [&]{ return !running_ || !acks_.empty(); });
         
         while (!acks_.empty()) {
-            auto ack = acks_.front(); acks_.pop();
+            auto ack = acks_.front(); 
+            acks_.pop();
+
             lk.unlock();
 
             // Converte endereços IP
             char server_ip[INET_ADDRSTRLEN];
             char dest_ip[INET_ADDRSTRLEN];
             struct in_addr server_addr;
+
             server_addr.s_addr = ack.server_addr;
+            
             inet_ntop(AF_INET, &server_addr, server_ip, INET_ADDRSTRLEN);
+
             if (ack.dest_addr != 0) {
                 struct in_addr dest_addr;
                 dest_addr.s_addr = ack.dest_addr;
