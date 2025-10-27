@@ -134,7 +134,6 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
 
             if (ack_packet.type == PKT_REQUEST_ACK && ack_packet.seqn == current_request.seqn)
             {
-                cout<<"Em request..." << to_string(ack_packet.ack.value)<<endl;
                 AckData ack_data;
                 ack_data.seqn = current_request.seqn;
                 ack_data.new_balance = ack_packet.ack.new_balance;
