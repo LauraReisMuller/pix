@@ -8,9 +8,10 @@
 CLIENT_IP="192.168.0.25"
 DEST_IP="10.0.0.2"
 PORT=4000
-NUM_TRANSACTIONS=10
-FIXED_VALUE=5
-QUERY_PROB=0.2
+NUM_TRANSACTIONS=100
+FIXED_VALUE=1.5
+QUERY_PROB=0.0      # 20% das requisições serão consultas
+
 
 # Cores
 GREEN='\033[0;32m'
@@ -42,23 +43,29 @@ for i in $(seq 1 $NUM_TRANSACTIONS); do
         # Consulta de saldo
         RAND_IP="10.0.0.$((RANDOM % 200 + 3))"
         echo "$RAND_IP 0" >> $COMMANDS_FILE
-        echo -e "\r[${YELLOW}Consulta${NC}] $RAND_IP 0  ($i/$NUM_TRANSACTIONS)" >&2
+        echo -e "\r[${YELLOW}Consulta${NC}] $RAND_IP 0  ($i/$NUM_TRANSACTIONS)"
     else
         # Transação normal
         echo "$DEST_IP $FIXED_VALUE" >> $COMMANDS_FILE
-        echo -e "\r[${GREEN}Transação${NC}] $DEST_IP $FIXED_VALUE  ($i/$NUM_TRANSACTIONS)" >&2
+        echo -e "\r[${GREEN}Transação${NC}] $DEST_IP $FIXED_VALUE  ($i/$NUM_TRANSACTIONS)"
     fi
 done
-echo "" >&2
+echo ""
 
-echo -e "${GREEN}✓ Comandos preparados${NC}" >&2
-echo -e "\n${YELLOW}Iniciando cliente...${NC}" >&2
-echo -e "${YELLOW}(Saída do cliente abaixo)${NC}" >&2
-echo -e "${BLUE}─────────────────────────────────────────────────${NC}\n" >&2
+CLIENT_EXE="./cliente.exe"
 
-./cliente.exe $PORT < $COMMANDS_FILE
+echo -e "${GREEN}✓ Comandos preparados${NC}"
+echo -e "\n${YELLOW}Iniciando cliente...${NC}"
+echo -e "${YELLOW}Pressione Ctrl+C para encerrar${NC}\n"
 
-echo -e "\n${BLUE}─────────────────────────────────────────────────${NC}" >&2
-echo -e "${BLUE}Encerrando...${NC}" >&2
+(
+    sleep 5
+    
+    cat "$COMMANDS_FILE"
+
+) | $CLIENT_EXE $PORT
+
+echo -e "\n${BLUE}Encerrando...${NC}"
+sleep 3
 rm -f $COMMANDS_FILE
-echo -e "${GREEN}✓ Cliente 1 finalizado${NC}" >&2
+echo -e "${GREEN}✓ Cliente 1 finalizado${NC}"

@@ -15,7 +15,7 @@ using namespace std;
 struct Client {
     string ip;
     int last_req;
-    double balance;
+    uint32_t balance;
 
     Packet last_ack_response;
     
@@ -27,16 +27,16 @@ struct Transaction {
     string origin_ip;
     int req_id;
     string destination_ip;
-    double amount;
+    uint32_t amount;
 
-    Transaction(int next_transaction_id, const string& origin_ip, int req_id, const string& destination_ip, double amount)
+    Transaction(int next_transaction_id, const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount)
         : id(next_transaction_id++), origin_ip(origin_ip), req_id(req_id), destination_ip(destination_ip), amount(amount) {}
 };
 
 struct BankSummary {
     int num_transactions;
-    double total_transferred;
-    double total_balance;
+    uint32_t total_transferred;
+    uint32_t total_balance;
 };
 
 class ServerDatabase {
@@ -57,11 +57,11 @@ public:
 
     bool addClient(const string& ip_address);
 
-    double getClientBalance(const string& ip_address);
-    double getClientBalance_unsafe(const string& ip_address);
+    uint32_t getClientBalance(const string& ip_address);
+    uint32_t getClientBalance_unsafe(const string& ip_address);
 
-    bool updateClientBalance(const string& ip_address, double new_balance);
-    bool updateClientBalance_unsafe(const string& ip_address, double new_balance);
+    bool updateClientBalance(const string& ip_address, uint32_t transaction_value);
+    bool updateClientBalance_unsafe(const string& ip_address, uint32_t transaction_value);
 
     uint32_t getClientLastReq(const string& ip_address);
 
@@ -76,13 +76,13 @@ public:
     
     bool makeTransaction(const string& origin_ip, const string& dest_ip, Packet request);
 
-    int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount);
-    int addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, double amount);
+    int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount);
+    int addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount);
 
     BankSummary getBankSummary() const;
     void updateBankSummary_unsafe();
     void updateBankSummary();
     
-    double getTotalBalance() const;
+    uint32_t getTotalBalance() const;
 };
 extern ServerDatabase server_db;

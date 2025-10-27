@@ -26,7 +26,7 @@ extern ServerInterface server_interface;
 
 void sendResponseAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen, 
                      uint32_t seqn_to_send, uint32_t balance, const string& origin_ip,  uint32_t dest_addr, uint32_t value, bool is_query, bool is_dup_oor) {
-    
+    cout<<"Em processing..."<<to_string(value)<<endl;
     Packet ack_packet;
     memset(&ack_packet, 0, sizeof(Packet));
     ack_packet.type = PKT_REQUEST_ACK;
@@ -88,8 +88,8 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         if (buffered_ack.seqn == last_processed_seqn) {
              final_balance = buffered_ack.ack.new_balance;
         } else {
-             double balance_double = server_db.getClientBalance(origin_ip_str);
-             final_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
+             uint32_t balance_uint32_t = server_db.getClientBalance(origin_ip_str);
+             final_balance = static_cast<uint32_t>(balance_uint32_t >= 0 ? balance_uint32_t : 0);
         }
 
         sendResponseAck(sockfd, client_addr, clilen, last_processed_seqn, final_balance, 
@@ -101,10 +101,10 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     }
 
     if (is_query) {
-        double balance_double = server_db.getClientBalance(origin_ip_str);
+        uint32_t balance_uint32_t = server_db.getClientBalance(origin_ip_str);
         
-        if (balance_double >= 0) {
-            final_balance = static_cast<uint32_t>(balance_double);
+        if (balance_uint32_t >= 0) {
+            final_balance = static_cast<uint32_t>(balance_uint32_t);
             
             server_db.updateClientLastReq(origin_ip_str, received_seqn);
             Packet query_ack;
@@ -117,8 +117,8 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         }
     } else {
         bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
-        double balance_double = server_db.getClientBalance(origin_ip_str);
-        final_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
+        uint32_t balance_uint32_t = server_db.getClientBalance(origin_ip_str);
+        final_balance = static_cast<uint32_t>(balance_uint32_t >= 0 ? balance_uint32_t : 0);
 
         if (!success) {
             log_message("Transação recusada por saldo insuficiente ou erro de validação.");

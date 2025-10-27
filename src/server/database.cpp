@@ -17,19 +17,19 @@
 ServerDatabase server_db; 
 
 bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest_ip, Packet packet) {
-    double amount = static_cast<double>(packet.req.value);
-    
     {
         WriteGuard client_lock(client_table_lock);
         WriteGuard history_lock(transaction_history_lock);
         WriteGuard summary_lock(bank_summary_lock); 
+
+        uint32_t amount = packet.req.value;
         
         auto it_orig = client_table.find(origin_ip);
         auto it_dest = client_table.find(dest_ip);
 
         bool clients_exist = (it_orig != client_table.end() && it_dest != client_table.end());
         bool enough_balance = (it_orig->second.balance >= amount);
-        bool valid_amount = (amount > 0.0);
+        bool valid_amount = (amount > 0);
     
         if (!clients_exist) {
             log_message("Transaction failed: Origin or Destination client not found.");
@@ -53,12 +53,12 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
 
         updateBankSummary_unsafe();
 
-        double balance_double = getClientBalance_unsafe(origin_ip);
+        uint32_t balance = getClientBalance_unsafe(origin_ip);
         
         Packet final_ack;
         final_ack.type = PKT_REQUEST_ACK;
         final_ack.seqn = packet.seqn; 
-        final_ack.ack.new_balance = static_cast<uint32_t>(balance_double >= 0 ? balance_double : 0);
+        final_ack.ack.new_balance = balance >= 0 ? balance : 0;
 
         updateClientLastAck_unsafe(origin_ip, final_ack);
     }
@@ -103,7 +103,7 @@ bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int re
     return false;
 }
 
-bool ServerDatabase::updateClientBalance(const string& ip_address, double transaction_value) {
+bool ServerDatabase::updateClientBalance(const string& ip_address, uint32_t transaction_value) {
     WriteGuard write_lock(client_table_lock);
 
     auto it = client_table.find(ip_address);
@@ -115,7 +115,7 @@ bool ServerDatabase::updateClientBalance(const string& ip_address, double transa
     return false;
 }
 
-bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, double transaction_value) {
+bool ServerDatabase::updateClientBalance_unsafe(const string& ip_address, uint32_t transaction_value) {
     auto it = client_table.find(ip_address);
 
     if (it != client_table.end()) {
@@ -164,7 +164,7 @@ Packet ServerDatabase::getClientLastAck(const string& ip_address) {
     return empty_ack;
 }
 
-double ServerDatabase::getClientBalance(const string& ip_address) {
+uint32_t ServerDatabase::getClientBalance(const string& ip_address) {
     ReadGuard read_lock(client_table_lock);
     
     auto it = client_table.find(ip_address);
@@ -175,7 +175,7 @@ double ServerDatabase::getClientBalance(const string& ip_address) {
     return ERROR; 
 }
 
-double ServerDatabase::getClientBalance_unsafe(const string& ip_address) {
+uint32_t ServerDatabase::getClientBalance_unsafe(const string& ip_address) {
     auto it = client_table.find(ip_address);
     if (it != client_table.end()) {
         return it->second.balance;
@@ -195,7 +195,7 @@ uint32_t ServerDatabase::getClientLastReq(const string& ip_address) {
     return 0;
 }
 
-int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
+int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount) {
     int tx_id = next_transaction_id.fetch_add(1);
     WriteGuard write_lock(transaction_history_lock);
 
@@ -205,7 +205,7 @@ int ServerDatabase::addTransaction(const string& origin_ip, int req_id, const st
 }
 
 
-int ServerDatabase::addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, double amount) {
+int ServerDatabase::addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount) {
     int tx_id = next_transaction_id.fetch_add(1);
 
     transaction_history.emplace_back(tx_id, origin_ip, req_id, destination_ip, amount);
@@ -222,12 +222,12 @@ BankSummary ServerDatabase::getBankSummary() const {
 void ServerDatabase::updateBankSummary_unsafe() {
     bank_summary.num_transactions = transaction_history.size();
     
-    bank_summary.total_transferred = 0.0;
+    bank_summary.total_transferred = 0;
     for (const auto& tx : transaction_history) {
         bank_summary.total_transferred += tx.amount;
     }
     
-    bank_summary.total_balance = 0.0;
+    bank_summary.total_balance = 0;
     for (const auto& pair : client_table) {
         bank_summary.total_balance += pair.second.balance;
     }
@@ -240,21 +240,21 @@ void ServerDatabase::updateBankSummary() {
 
     bank_summary.num_transactions = transaction_history.size();
     
-    bank_summary.total_transferred = 0.0;
+    bank_summary.total_transferred = 0;
     for (const auto& tx : transaction_history) {
         bank_summary.total_transferred += tx.amount;
     }
     
-    bank_summary.total_balance = 0.0;
+    bank_summary.total_balance = 0;
     for (const auto& pair : client_table) {
         bank_summary.total_balance += pair.second.balance;
     }
 }
 
-double ServerDatabase::getTotalBalance() const {
+uint32_t ServerDatabase::getTotalBalance() const {
     ReadGuard read_lock(client_table_lock);
 
-    double total = 0.0;
+    uint32_t total = 0;
     for (const auto& pair : client_table) {
         total += pair.second.balance;
     }

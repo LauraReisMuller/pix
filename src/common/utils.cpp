@@ -18,7 +18,9 @@ string get_timestamp_str() {
 }
 
 void log_message(const char *msg) {
-    cout << get_timestamp_str() << " " << msg << endl;
+    //cout << get_timestamp_str() << " " << msg << endl;
+    //oi
+    return;
 }
 
 uint32_t ipToUint32(const std::string& ip_str) {
