@@ -1,8 +1,4 @@
-// Interface do servidor: apresenta updates e sumários do banco.
-// Esta componente recebe notificações (`notifyUpdate`) do processamento
-// e imprime linhas de log e um resumo atual do estado (nº transações,
-// total transferido, saldo total). Corre numa thread dedicada.
-
+// interface.cpp
 #include "server/interface.h"
 #include "server/database.h"
 #include "common/utils.h"
@@ -37,6 +33,7 @@ void ServerInterface::notifyUpdate(const string& logline) {
 }
 
 void ServerInterface::run() {
+    // Mensagem inicial com dados do BankSummary (executada UMA vez na inicialização)
     {
         auto summary = server_db.getBankSummary();
         cout << get_timestamp_str()
@@ -54,12 +51,14 @@ void ServerInterface::run() {
             auto line = msgs_.front(); msgs_.pop();
             lk.unlock();
 
+            // Imprime linha de log (ex.: req, dup, etc.)
             if (!line.empty()) {
                 ostringstream oss;
                 oss << get_timestamp_str() << " " << line;
                 cout << oss.str() << endl;
             }
 
+            // Imprime resumo atualizado
             auto summary = server_db.getBankSummary();
             ostringstream summary_oss;
             summary_oss << "num_transactions " << summary.num_transactions

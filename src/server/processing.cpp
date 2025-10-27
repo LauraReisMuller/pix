@@ -1,13 +1,3 @@
-/**
- * Responsável por processar pedidos PKT_REQUEST recebidos dos clientes.
- *
- * Funcionalidades principais:
- *  - detecção de pedidos duplicados / fora de ordem (usando last_req por cliente)
- *  - resposta imediata com ACK contendo o novo saldo
- *  - execução de transacções através de `ServerDatabase::makeTransaction`
- */
-
-
 #include "server/processing.h"
 #include "server/database.h"
 #include "server/interface.h"
@@ -18,7 +8,7 @@
 #include <iostream>
 #include <string>
 #include <arpa/inet.h>
-#include <cstring>
+#include <cstring> // Para memset
 
 using namespace std;
 
@@ -59,7 +49,8 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     
     uint32_t final_balance = 0; 
     bool is_query = (packet.req.value == 0);
-
+    
+    // --- 1. VERIFICAÇÃO DE DUPLICIDADE/SEQUÊNCIA (CRÍTICO) ---
     uint32_t last_processed_seqn = server_db.getClientLastReq(origin_ip_str);
     uint32_t received_seqn = packet.seqn;
     
@@ -87,14 +78,18 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
              final_balance = (balance >= 0 ? balance : 0);
         }
 
+        // Envio do ACK: Usa o last_processed_seqn como ID de resposta
         sendResponseAck(sockfd, client_addr, clilen, last_processed_seqn, final_balance, 
                         origin_ip_str, ack_dest_addr, ack_value, is_query, true);
 
+        // Notifica a interface sobre o pacote duplicado/fora de ordem
         server_interface.notifyUpdate(dup_msg);
 
         return;
     }
 
+
+    // --- 2. EXECUÇÃO (received_seqn == last_processed_seqn + 1) ---
     if (is_query) {
         uint32_t balance = server_db.getClientBalance(origin_ip_str);
         
@@ -102,6 +97,8 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
             final_balance = balance;
             
             server_db.updateClientLastReq(origin_ip_str, received_seqn);
+            
+            // Cria e bufferiza ACK
             Packet query_ack;
             query_ack.type = PKT_REQUEST_ACK;
             query_ack.seqn = received_seqn;
@@ -111,6 +108,7 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
             server_db.updateClientLastAck(origin_ip_str, query_ack);
         }
     } else {
+        // Transação Real
         bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
         uint32_t balance = server_db.getClientBalance(origin_ip_str);
         final_balance = (balance >= 0 ? balance : 0);
@@ -120,9 +118,11 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         }
     }
     
+    // --- 3. ENVIO DO ACK DE SUCESSO/EXECUÇÃO ---
     sendResponseAck(sockfd, client_addr, clilen, received_seqn, final_balance, 
                             origin_ip_str, packet.req.dest_addr, packet.req.value, is_query, false);
 
+    // --- 4. NOTIFICA A INTERFACE COM A MENSAGEM DE LOG ---
     string msg_log = "client " + origin_ip_str + 
                      " id_req " + to_string(packet.seqn) +
                      " dest " + dest_ip_str_cpp + 

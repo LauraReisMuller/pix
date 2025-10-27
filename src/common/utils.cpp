@@ -1,16 +1,13 @@
-// Funções utilitárias utilizadas por cliente e servidor:
-// - formatação de timestamp para logging;
-// - logging simples (`log_message`);
-// - conversões IP string <-> uint32_t.
-
 #include "common/utils.h"
+
+/* Funções utilitárias (timestamp, formatação de logs) */
 
 string get_timestamp_str() {
     using namespace chrono;
     auto tp = system_clock::now();
     time_t t = system_clock::to_time_t(tp);
     tm tm{};
-    localtime_r(&t, &tm);
+    localtime_r(&t, &tm); // Thread-safe
     
     char buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);

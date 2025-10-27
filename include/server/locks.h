@@ -11,9 +11,9 @@ private:
     pthread_mutex_t _mutex;
     pthread_cond_t _cond;
 
-    int _readers;
-    int _writers_waiting;
-    bool _writer_active;
+    int _readers;          // número de leitores ativos
+    int _writers_waiting;  // número de escritores esperando
+    bool _writer_active;   // se há um escritor ativo
 
 public:
     RWLock();
@@ -23,10 +23,14 @@ public:
     void write_lock();
     void unlock();
 
+    // Previne cópia
     RWLock(const RWLock&) = delete;
     RWLock& operator=(const RWLock&) = delete;
 };
 
+/**
+ * @brief Guard RAII para leitura (permite múltiplos leitores simultâneos)
+ */
 class ReadGuard {
 private:
     RWLock& _lock;
@@ -39,6 +43,9 @@ public:
     ReadGuard& operator=(const ReadGuard&) = delete;
 };
 
+/**
+ * @brief Guard RAII para escrita (acesso exclusivo)
+ */
 class WriteGuard {
 private:
     RWLock& _lock;

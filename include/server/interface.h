@@ -26,6 +26,7 @@ public:
     void start();
     void stop();
 
+    // Sinaliza uma nova atualização + mensagem opcional de log
     void notifyUpdate(const string& logline = "");
 
 private:
@@ -38,6 +39,7 @@ private:
     void run();
 };
 
+// Instância global (usada por processing/discovery)
 extern ServerInterface server_interface;
 
 #endif // SERVER_INTERFACE_H

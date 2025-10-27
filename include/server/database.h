@@ -41,20 +41,25 @@ struct BankSummary {
 
 class ServerDatabase {
 private:
+    // Tabela de clientes (hash table)
     unordered_map<string, Client> client_table;
     mutable RWLock client_table_lock;
     
+    // Histórico de transações
     vector<Transaction> transaction_history;
     mutable RWLock transaction_history_lock;
     
+    // Resumo/estatísticas do banco
     BankSummary bank_summary;
     mutable RWLock bank_summary_lock;
 
+    // Contador para gerar IDs únicos de transação
     atomic<int> next_transaction_id;
 
 public:
     ServerDatabase() : next_transaction_id(1) {}
 
+    // === Métodos para gerenciar clientes ===
     bool addClient(const string& ip_address);
 
     uint32_t getClientBalance(const string& ip_address);
@@ -74,15 +79,19 @@ public:
     bool updateClientLastAck(const string& ip_address, const Packet& ack);
 
     
+    // === Métodos para gerenciar transações ===
     bool makeTransaction(const string& origin_ip, const string& dest_ip, Packet request);
 
     int addTransaction(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount);
     int addTransaction_unsafe(const string& origin_ip, int req_id, const string& destination_ip, uint32_t amount);
 
+    // === Métodos para estatísticas do banco ===
     BankSummary getBankSummary() const;
     void updateBankSummary_unsafe();
     void updateBankSummary();
     
     uint32_t getTotalBalance() const;
 };
+
+// Instância única do banco de dados do servidor
 extern ServerDatabase server_db;

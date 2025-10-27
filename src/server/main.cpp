@@ -1,11 +1,3 @@
-/**
- * Servidor principal: inicializa socket UDP de escuta, arranca a interface do servidor,
- * cria handlers de descoberta/processamento e entra no loop principal (recvfrom).
- *
- * Cada pedido de processamento é despachado para uma thread separada (detach)
- * para não bloquear o loop de recepção.
- */
-
 #include "server/discovery.h"
 #include "server/database.h"
 #include "server/processing.h"
@@ -17,21 +9,33 @@
 
 using namespace std;
 
+/**
+ * @brief Cria e configura um socket UDP para o servidor.
+ * @param port Porta na qual o servidor irá escutar
+ * @return File descriptor do socket criado
+ * @throws runtime_error Se falhar ao criar ou fazer bind do socket
+ */
+
 int setupServerSocket(int port) {
+    // Cria um socket UDP
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         log_message("ERROR opening server socket");
         throw runtime_error("Failed to open socket.");
     }
+
+    // Permite reutilizar a porta (útil para reiniciar o servidor rapidamente)
     int optval = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
 
+    // Configura o endereço do servidor
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;  // Escuta em todas as interfaces
     serv_addr.sin_port = htons(port);
 
+    // Faz bind do socket à porta especificada
     if (bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         log_message("ERROR on binding server socket");
         close(sockfd);
@@ -40,6 +44,15 @@ int setupServerSocket(int port) {
     return sockfd;
 }
 
+/**
+ * @brief Processa um pacote recebido, delegando para o handler apropriado.
+ * @param packet Pacote recebido
+ * @param client_addr Endereço do cliente que enviou o pacote
+ * @param clilen Tamanho da estrutura sockaddr_in
+ * @param sockfd Socket para enviar respostas
+ * @param discovery_handler Handler de descoberta
+ * @param processing_handler Handler de processamento de requisições
+ */
 void handlePacket(const Packet& packet, 
                   const struct sockaddr_in& client_addr, 
                   socklen_t clilen, 
@@ -47,16 +60,20 @@ void handlePacket(const Packet& packet,
                   ServerDiscovery& discovery_handler, 
                   ServerProcessing& processing_handler) {
     
+    //Criamos cópias dos dados de I/O para garantir que a thread não use dados antigos.
+    //pois o buffer 'received_packet' será sobrescrito rapidamente pelo runServerLoop.
     Packet packet_copy = packet;
     struct sockaddr_in client_addr_copy = client_addr;
 
     switch (packet.type) {
         case PKT_DISCOVER:
 
+            // Descoberta é rápida, pode ser tratada na thread principal (só registro e envio de ACK)
             discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
             break;
         
         case PKT_REQUEST:
+            //Processar transações em nova thread (uma thread por requisição)
             thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
                 processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
             }).detach(); 
@@ -68,7 +85,12 @@ void handlePacket(const Packet& packet,
     }
 }
 
-
+/**
+ * @brief Loop principal do servidor que recebe e processa pacotes.
+ * @param sockfd Socket do servidor
+ * @param discovery_handler Handler de descoberta
+ * @param processing_handler Handler de processamento de requisições
+ */
 void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcessing& processing_handler) {
     Packet received_packet;
     struct sockaddr_in client_addr;
@@ -77,6 +99,7 @@ void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcess
     while (true) {
         memset(&received_packet, 0, sizeof(Packet));
         
+        // Recebe pacote de qualquer cliente
         ssize_t n = recvfrom(sockfd, (char*)&received_packet, sizeof(Packet), 0,
                              (struct sockaddr*)&client_addr, &clilen);
         
@@ -85,11 +108,13 @@ void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcess
             continue;
         }
 
+        // Delega o processamento baseado no tipo do pacote
         handlePacket(received_packet, client_addr, clilen, sockfd, 
                     discovery_handler, processing_handler);
     }
 }
 
+// O servidor deve ser iniciado com a porta UDP como parâmetro: ./servidor 4000 
 int main(int argc, char* argv[]) {
 
     if (argc < 2) {
@@ -109,23 +134,30 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        // Configura o socket do servidor
         int sockfd = setupServerSocket(port);
 
+        // Inicia a thread da interface (não-bloqueante)
         server_interface.start();
 
+        // Cria instâncias dos handlers
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
 
+        /*CLIENTE FAKE PARA TESTE*/
         const string FAKE_CLIENT_IP = "10.0.0.2";
         
+        // Garanta que o cliente fake seja adicionado.
         if (server_db.addClient(FAKE_CLIENT_IP)) {
             log_message(("SUCCESS: Added fake client " + FAKE_CLIENT_IP + " for testing.\n").c_str());
         } else {
             log_message("WARNING: Fake client already existed or failed to add.");
         }
 
+        // Inicia o loop principal do servidor
         runServerLoop(sockfd, discovery_handler, processing_handler);
-        
+
+        // Para a interface ao encerrar
         server_interface.stop();
         close(sockfd);
 

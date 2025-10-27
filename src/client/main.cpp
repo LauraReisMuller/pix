@@ -1,8 +1,3 @@
-// Inicialização o cliente: descobre o servidor via broadcast UDP,
-// cria o gerenciador de pedidos (`ClientRequest`) e a interface do utilizador
-// (`ClientInterface`) e arranca o ciclo de processamento em thread.
-// O processo também regista um handler para SIGINT para encerramento (flag `global_running`).
-
 #include "client/discovery.h"
 #include "client/interface.h"
 #include "client/request.h"
@@ -12,18 +7,22 @@
 using namespace std;
 using namespace chrono;
 
+//flag global de execucao para tratamento de sinal
 atomic<bool> global_running{true};
 
+//Handler de sinal (para ctrl+c)
 void signal_handler(int signum) {
 
     if (signum == SIGINT) {
 
+        //Sinaliza a todas as threads que o programa deve parar
         global_running = false; 
     }
 }
 
 int main(int argc, char* argv[]) {
 
+    // O cliente deve ser iniciado com a porta UDP como parâmetro (ex: ./cliente 4000)
     if (argc < 2) {
         cerr << "ERRO: Uso correto: " << argv[0] << " <PORTA_UDP>" << endl;
         return EXIT_FAILURE;
@@ -37,6 +36,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    //Iniciar a Fase de Descoberta
     ClientDiscovery client_disco(port);
     string server_ip = client_disco.discoverServer();
 
@@ -51,12 +51,16 @@ int main(int argc, char* argv[]) {
     client_interface.start(); 
     client_interface.displayDiscoverySuccess(server_ip);
     
+    // 4. Iniciar a Thread de Processamento de Requisições
+    // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)
     thread processing_thread(&ClientRequest::runProcessingLoop, &request_manager);
 
+    // Espera até que o usuário pressione CTRL+D ou CTRL+C.
     while (global_running.load() && (cin.good() || !request_manager.isQueueEmpty())) {
         this_thread::sleep_for(milliseconds(100)); 
     }
 
+    // Sinaliza todas as threads para pararem
     global_running = false; 
     request_manager.stopProcessing();
 
