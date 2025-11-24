@@ -85,6 +85,7 @@ include/
     discovery.h
     processing.h
     interface.h
+    locks.h
   client/
     discovery.h
     request.h
@@ -98,6 +99,7 @@ src/
     processing.cpp
     interface.cpp
     database.cpp
+    locks.cpp
   client/
     main.cpp
     discovery.cpp
