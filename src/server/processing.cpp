@@ -2,15 +2,17 @@
 #include "server/database.h"
 #include "server/interface.h"
 #include "common/protocol.h" 
-#include "common/utils.h"    
+#include "common/utils.h"
+#include "server/replication.h"    
 #include <unistd.h>
 #include <stdexcept>
 #include <iostream>
 #include <string>
 #include <arpa/inet.h>
-#include <cstring> // Para memset
-
+#include <cstring> 
 using namespace std;
+
+extern ReplicationManager replication_manager;
 
 void sendResponseAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen, 
                      uint32_t seqn_to_send, uint32_t balance, const string& origin_ip,  uint32_t dest_addr, uint32_t value, bool is_query, bool is_dup_oor) {
@@ -108,7 +110,34 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
             server_db.updateClientLastAck(origin_ip_str, query_ack);
         }
     } else {
-        // Transação Real
+
+       //Transação real (com replicação)
+        
+        //Se for Backup, ignora silenciosamente (return)
+        if (!replication_manager.isLeader()) return;
+
+        //Prepara IP destino
+        char dest_ip_temp[INET_ADDRSTRLEN];
+        struct in_addr dest_addr_struct;
+        dest_addr_struct.s_addr = packet.req.dest_addr;
+        inet_ntop(AF_INET, &dest_addr_struct, dest_ip_temp, INET_ADDRSTRLEN);
+        dest_ip_str_cpp = string(dest_ip_temp);
+
+        //Tenta replicar
+        bool replicated = replication_manager.replicateTransaction(
+            origin_ip_str, 
+            dest_ip_str_cpp, 
+            packet.req.value, 
+            packet.seqn
+        );
+
+        if (!replicated) {
+            //Se falhou a replicação, abortamos tudo
+            log_message("ERRO: Falha ao replicar. Abortando transação.");
+            return; 
+        }
+
+        //Se replicou, aplica localmente 
         bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
         uint32_t balance = server_db.getClientBalance(origin_ip_str);
         final_balance = (balance >= 0 ? balance : 0);

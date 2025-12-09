@@ -4,9 +4,11 @@
 #include "server/interface.h"
 #include "common/utils.h"
 #include "common/protocol.h"
+#include "server/replication.h"
 #include <stdexcept>
 #include <unistd.h>
 
+ReplicationManager replication_manager;
 
 int setupServerSocket(int port) {
     // Cria um socket UDP
@@ -53,7 +55,11 @@ void handlePacket(const Packet& packet,
         case PKT_DISCOVER:
 
             // Descoberta é rápida, pode ser tratada na thread principal (só registro e envio de ACK)
-            discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
+            // Apenas o Líder responde a descoberta de clientes.
+            // Se for backup, ignoramos silenciosamente.
+            if (replication_manager.isLeader()) {
+                discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
+            }
             break;
         
         case PKT_REQUEST:
@@ -62,7 +68,23 @@ void handlePacket(const Packet& packet,
                 processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
             }).detach(); 
             break;
-        
+
+        case PKT_REPLICATION_REQ:
+        case PKT_REP_CLIENT_REQ:
+            //Recebimento de replicação (Backup recebendo do Líder)
+            //Lançamos em thread para manter o padrão não-bloqueante da main
+            thread([packet_copy, client_addr_copy]() {
+                replication_manager.handleReplicationMessage(packet_copy, client_addr_copy);
+            }).detach();
+            break;
+
+        case PKT_REPLICATION_ACK:
+        case PKT_REP_CLIENT_ACK:
+            //ACK de replicação recebido pelo Líder.
+            //Geralmente isso é pego pelo recvfrom dentro do loop de espera do 'replicateTransaction'.
+            //Se cair aqui, é porque chegou atrasado ou duplicado. Apenas ignoramos.
+            break;
+
         default:
             log_message("Received packet with unknown type. Ignoring.");
             break;
@@ -78,7 +100,7 @@ void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcess
     while (true) {
         memset(&received_packet, 0, sizeof(Packet));
         
-        // Recebe pacote de qualquer cliente
+        // Recebe pacote de qualquer cliente (ou outro servidor)
         ssize_t n = recvfrom(sockfd, (char*)&received_packet, sizeof(Packet), 0,
                              (struct sockaddr*)&client_addr, &clilen);
         
@@ -93,28 +115,36 @@ void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcess
     }
 }
 
-// O servidor deve ser iniciado com a porta UDP como parâmetro: ./servidor 4000 
+// O servidor deve ser iniciado com: ./servidor <PORT> <ID> <IS_LEADER>
+// Ex Líder:  ./servidor 4000 0 1
+// Ex Backup: ./servidor 4001 1 0
 int main(int argc, char* argv[]) {
 
     if (argc < 2) {
-        cerr << "Usage: " << argv[0] << " <PORT>" << endl;
+        cerr << "Usage: " << argv[0] << " <PORT> [ID] [IS_LEADER (1/0)]" << endl;
         return 1;
     }
     
     int port;
+    int my_id = 0;       // Default ID
+    bool is_leader = true; // Default Leader (para manter compatibilidade se não passar args)
+
     try {
         port = stoi(argv[1]);
-    } catch (const invalid_argument& e) {
-        cerr << "Invalid port number." << endl;
-        return 1;
-    } catch (const out_of_range& e) {
-        cerr << "Port number out of range." << endl;
+        //Parsing de argumentos extras para Replicação
+        if (argc > 2) my_id = stoi(argv[2]);
+        if (argc > 3) is_leader = (stoi(argv[3]) == 1);
+    } catch (const exception& e) {
+        cerr << "Invalid arguments: " << e.what() << endl;
         return 1;
     }
 
     try {
         // Configura o socket do servidor
         int sockfd = setupServerSocket(port);
+        
+        //Inicializa o Replication Manager com o socket criado
+        replication_manager.init(sockfd, my_id, is_leader);
 
         // Inicia a thread da interface (não-bloqueante)
         server_interface.start();

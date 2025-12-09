@@ -20,11 +20,22 @@ typedef struct {
     uint32_t server_addr;
 } AckData;
 
+//Estrutura para replicação
+typedef struct {
+    uint32_t origin_addr; // IP de quem pagou
+    uint32_t dest_addr;   // IP de quem recebeu
+    uint32_t value;       // Valor
+} ReplicationData;
+
 typedef enum {
     PKT_DISCOVER,       // Mensagem de Descoberta (Cliente -> Servidor)
     PKT_DISCOVER_ACK,   // Resposta da Descoberta (Servidor -> Cliente)
     PKT_REQUEST,        // Requisicao de Transferencia (Cliente -> Servidor)
-    PKT_REQUEST_ACK     // Confirmacao de Requisicao (Servidor -> Cliente)
+    PKT_REQUEST_ACK,    // Confirmacao de Requisicao (Servidor -> Cliente)
+    PKT_REPLICATION_REQ, //Replica transação (Servidor Líder -> Servidor Backups) 
+    PKT_REPLICATION_ACK,
+    PKT_REP_CLIENT_REQ, //Replica criação de cliente (Servidor Líder -> Servidor Backups)
+    PKT_REP_CLIENT_ACK
 } PacketType;
 
 //Estrutura de Pacote Genérico
@@ -37,6 +48,7 @@ typedef struct {
     union {
         RequestData req;
         AckData ack;
+        ReplicationData rep;
     };
 
 } Packet;
