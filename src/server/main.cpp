@@ -153,17 +153,18 @@ int main(int argc, char* argv[]) {
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
 
-/*
-        // CLIENTE FAKE PARA TESTE
-        const string FAKE_CLIENT_IP = "10.0.0.2";
+        // === CLIENTE FAKE PARA TESTE ===
+       // Adicionamos em TODOS (Líder e Backups) para garantir que todos
+        // partam do mesmo estado inicial sem depender da rede.
+        const string FAKE_CLIENT_IP = "10.0.0.2"; 
         
-        // Garanta que o cliente fake seja adicionado.
         if (server_db.addClient(FAKE_CLIENT_IP)) {
-            log_message(("SUCCESS: Added fake client " + FAKE_CLIENT_IP + " for testing.\n").c_str());
+            // IMPORTANTE: Atualize o sumário para contabilizar o saldo inicial desse cliente
+            server_db.updateBankSummary(); 
+            log_message(("SUCCESS: Added hardcoded client " + FAKE_CLIENT_IP + " (Initial State).\n").c_str());
         } else {
-            log_message("WARNING: Fake client already existed or failed to add.");
+            log_message("WARNING: Fake client already existed.");
         }
-*/
         // Inicia o loop principal do servidor
         runServerLoop(sockfd, discovery_handler, processing_handler);
 

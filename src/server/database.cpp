@@ -15,8 +15,14 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
         
         auto it_orig = client_table.find(origin_ip);
         auto it_dest = client_table.find(dest_ip);
-
         bool clients_exist = (it_orig != client_table.end() && it_dest != client_table.end());
+        
+        if (!clients_exist) {
+            // Se não existe, retorna falso ANTES de tentar ler saldo
+            log_message("Transaction failed: Client not found.");
+            return false; 
+        }
+
         bool enough_balance = (it_orig->second.balance >= amount);
         bool valid_amount = (amount > 0);
     
@@ -241,8 +247,8 @@ void ServerDatabase::updateBankSummary_unsafe() {
 
 // Escrita / Leitura
 void ServerDatabase::updateBankSummary() {
-    ReadGuard transaction_lock(transaction_history_lock);
     ReadGuard client_lock(client_table_lock);
+    ReadGuard transaction_lock(transaction_history_lock);
     WriteGuard summary_lock(bank_summary_lock);
 
     bank_summary.num_transactions = transaction_history.size();

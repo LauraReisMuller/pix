@@ -15,8 +15,7 @@ string get_timestamp_str() {
 }
 
 void log_message(const char *msg) {
-    //cout << get_timestamp_str() << " " << msg << endl;
-    //oi
+    cout << get_timestamp_str() << " " << msg << endl;
     return;
 }
 
