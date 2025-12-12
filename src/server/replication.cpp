@@ -1,22 +1,13 @@
-#include "../../include/server/replication.h"
-#include "../../include/server/database.h"
-#include "../../include/common/utils.h"
-#include "../../include/server/interface.h"
-#include <cstring>
-#include <iostream>
-#include <arpa/inet.h>
-#include <unistd.h>
+#include "server/replication.h"
 
-// Referência ao banco de dados global (definido em database.cpp)
-extern ServerDatabase server_db;
-extern ServerInterface server_interface;
+ReplicationManager replication_manager;
 
 ReplicationManager::ReplicationManager() : my_id(-1), sockfd(-1), is_leader_flag(false) {}
 
-void ReplicationManager::init(int socket, int id, bool leader_status) {
+void ReplicationManager::init(int socket, int id, bool is_leader) {
     this->sockfd = socket;
     this->my_id = id;
-    this->is_leader_flag = leader_status;
+    this->is_leader_flag = is_leader;
 
     // --- CONFIGURAÇÃO HARDCODED (Até o Max fazer a Descoberta) ---
     // Ajuste esses IPs/Portas conforme o seu docker-compose ou teste local
@@ -28,7 +19,7 @@ void ReplicationManager::init(int socket, int id, bool leader_status) {
     }
 }
 
-void ReplicationManager::addReplica(int id, std::string ip, int port) {
+void ReplicationManager::addReplica(int id, string ip, int port) {
     ReplicaInfo r;
     r.id = id; r.ip = ip; r.port = port; r.active = true;
     memset(&r.addr, 0, sizeof(r.addr));
@@ -39,7 +30,7 @@ void ReplicationManager::addReplica(int id, std::string ip, int port) {
 }
 
 // --- LÓGICA DO LÍDER ---
-bool ReplicationManager::replicateTransaction(const std::string& origin_ip, const std::string& dest_ip, uint32_t amount, uint32_t seqn) {
+bool ReplicationManager::replicateTransaction(const string& origin_ip, const string& dest_ip, uint32_t amount, uint32_t seqn) {
     if (!is_leader_flag) return false;
 
     Packet pkt;
@@ -96,7 +87,7 @@ bool ReplicationManager::replicateTransaction(const std::string& origin_ip, cons
     return (acks_received >= 1);
 }
 
-bool ReplicationManager::replicateNewClient(const std::string& client_ip) {
+bool ReplicationManager::replicateNewClient(const string& client_ip) {
     if (!is_leader_flag) return false;
 
     Packet pkt;
@@ -129,7 +120,7 @@ void ReplicationManager::handleReplicationMessage(const Packet& pkt, const struc
     cout << "[DEBUG] Backup recebeu pacote tipo: " << pkt.type << endl;
 
     if (pkt.type == PKT_REP_CLIENT_REQ) {
-        std::string client_ip = uint32ToIp(pkt.rep.origin_addr);
+        string client_ip = uint32ToIp(pkt.rep.origin_addr);
         
         // Aplica no DB Local do Backup
         server_db.addClient(client_ip);
@@ -144,8 +135,8 @@ void ReplicationManager::handleReplicationMessage(const Packet& pkt, const struc
     if (pkt.type != PKT_REPLICATION_REQ) return;
 
     // 1. Converte dados de volta (Uint32 -> String)
-    std::string origin_ip = uint32ToIp(pkt.rep.origin_addr);
-    std::string dest_ip   = uint32ToIp(pkt.rep.dest_addr);
+    string origin_ip = uint32ToIp(pkt.rep.origin_addr);
+    string dest_ip   = uint32ToIp(pkt.rep.dest_addr);
 
     cout << "[DEBUG] Tentando processar transacao de " << origin_ip << " para " << dest_ip << endl;
 

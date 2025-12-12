@@ -4,6 +4,9 @@
 #include <string>
 #include <netinet/in.h>
 #include "common/protocol.h" 
+#include "server/database.h"
+#include "common/utils.h"
+#include "server/replication.h" 
 
 class ServerDiscovery {
 public:

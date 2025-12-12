@@ -2,13 +2,13 @@
 #include "server/database.h"
 #include "server/processing.h"
 #include "server/interface.h"
+#include "server/election.h"
+#include "server/replication.h"
 #include "common/utils.h"
 #include "common/protocol.h"
-#include "server/replication.h"
 #include <stdexcept>
 #include <unistd.h>
 
-ReplicationManager replication_manager;
 
 int setupServerSocket(int port) {
     // Cria um socket UDP
@@ -38,6 +38,16 @@ int setupServerSocket(int port) {
     return sockfd;
 }
 
+// Callback chamado quando o líder muda
+void onLeaderChange(uint32_t new_leader_id, bool i_am_leader) {
+    if (i_am_leader) {
+        log_message("=== I AM NOW THE PRIMARY (LEADER) ===");
+        replication_manager.setLeader(true);
+    } else {
+        log_message(("=== New leader elected: ID " + to_string(new_leader_id) + " ===").c_str());
+        replication_manager.setLeader(false);
+    }
+}
 
 void handlePacket(const Packet& packet, 
                   const struct sockaddr_in& client_addr, 
@@ -51,22 +61,54 @@ void handlePacket(const Packet& packet,
     Packet packet_copy = packet;
     struct sockaddr_in client_addr_copy = client_addr;
 
+    // === MENSAGENS DE ELEIÇÃO (BULLY) ===
+    if (packet.type >= PKT_ELECTION && packet.type <= PKT_HEARTBEAT_ACK) {
+        switch (packet.type) {
+            case PKT_ELECTION:
+                election_manager.handleElectionMessage(packet, client_addr);
+                break;
+            case PKT_ELECTION_OK:
+                election_manager.handleOkMessage(packet, client_addr);
+                break;
+            case PKT_COORDINATOR:
+                election_manager.handleCoordinatorMessage(packet, client_addr);
+                break;
+            case PKT_HEARTBEAT:
+                election_manager.handleHeartbeatMessage(packet, client_addr);
+                break;
+            case PKT_HEARTBEAT_ACK:
+                election_manager.handleHeartbeatAck(packet, client_addr);
+                break;
+            default:
+                log_message("Unknown election message type.");
+                break;
+        }
+        return;
+    }
+
+    // === MENSAGENS DE CLIENTE ===
     switch (packet.type) {
         case PKT_DISCOVER:
-
             // Descoberta é rápida, pode ser tratada na thread principal (só registro e envio de ACK)
             // Apenas o Líder responde a descoberta de clientes.
-            // Se for backup, ignoramos silenciosamente.
-            if (replication_manager.isLeader()) {
+            if (election_manager.isLeader()) {
                 discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
+            } else {
+                log_message("Received PKT_DISCOVER but I'm not the leader. Ignoring.");
             }
             break;
         
         case PKT_REQUEST:
-            //Processar transações em nova thread (uma thread por requisição)
-            thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
-                processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
-            }).detach(); 
+            // Apenas o líder processa requisições de cliente
+            if (election_manager.isLeader()) {
+                //Processar transações em nova thread (uma thread por requisição)
+                thread([packet_copy, client_addr_copy, clilen, sockfd, &processing_handler]() {
+                    processing_handler.handleRequest(packet_copy, client_addr_copy, clilen, sockfd);
+                }).detach(); 
+            } else {
+                log_message("Received PKT_REQUEST but I'm not the leader. Ignoring.");
+                // TODO: Opcionalmente, redirecionar cliente para o líder atual
+            }
             break;
 
         case PKT_REPLICATION_REQ:
@@ -115,67 +157,101 @@ void runServerLoop(int sockfd, ServerDiscovery& discovery_handler, ServerProcess
     }
 }
 
-// O servidor deve ser iniciado com: ./servidor <PORT> <ID> <IS_LEADER>
-// Ex Líder:  ./servidor 4000 0 1
-// Ex Backup: ./servidor 4001 1 0
+// O servidor deve ser iniciado com: ./servidor <SERVER_ID> <CLIENT_PORT> [REPLICA_PORT]
 int main(int argc, char* argv[]) {
 
-    if (argc < 2) {
-        cerr << "Usage: " << argv[0] << " <PORT> [ID] [IS_LEADER (1/0)]" << endl;
+    if (argc < 3) {
+        cerr << "Usage: " << argv[0] << " <SERVER_ID> <CLIENT_PORT> [REPLICA_PORT]" << endl;
+        cerr << "  SERVER_ID: Unique ID for this replica (1, 2, 3, 4, ...)" << endl;
+        cerr << "  CLIENT_PORT: Port for client connections" << endl;
+        cerr << "  REPLICA_PORT: Port for replica communication (default: CLIENT_PORT+1000)" << endl;
+        cerr << "" << endl;
+        cerr << "Example for 1 Primary + 3 Backups:" << endl;
+        cerr << "  Terminal 1: " << argv[0] << " 1 4001 5001  # Primary (lowest ID)" << endl;
+        cerr << "  Terminal 2: " << argv[0] << " 2 4002 5002  # Backup" << endl;
+        cerr << "  Terminal 3: " << argv[0] << " 3 4003 5003  # Backup" << endl;
+        cerr << "  Terminal 4: " << argv[0] << " 4 4004 5004  # Backup" << endl;
         return 1;
     }
     
-    int port;
-    int my_id = 0;       // Default ID
-    bool is_leader = true; // Default Leader (para manter compatibilidade se não passar args)
-
+    int server_id;
+    int client_port;
+    int replica_port;
+    
     try {
-        port = stoi(argv[1]);
-        //Parsing de argumentos extras para Replicação
-        if (argc > 2) my_id = stoi(argv[2]);
-        if (argc > 3) is_leader = (stoi(argv[3]) == 1);
+        server_id = stoi(argv[1]);
+        client_port = stoi(argv[2]);
+        replica_port = (argc >= 4) ? stoi(argv[3]) : (client_port + 1000);
     } catch (const exception& e) {
         cerr << "Invalid arguments: " << e.what() << endl;
         return 1;
     }
 
     try {
-        // Configura o socket do servidor
-        int sockfd = setupServerSocket(port);
-        
-        //Inicializa o Replication Manager com o socket criado
-        replication_manager.init(sockfd, my_id, is_leader);
+        log_message(("=== Starting Server ID " + to_string(server_id) + " ===").c_str());
+        log_message(("Client Port: " + to_string(client_port)).c_str());
+        log_message(("Replica Port: " + to_string(replica_port)).c_str());
 
-        // Inicia a thread da interface (não-bloqueante)
+        // Configura sockets
+        int client_sockfd = setupServerSocket(client_port);
+        int replica_sockfd = setupServerSocket(replica_port);
+
+        // === INICIALIZA ELECTION MANAGER ===
+        // NÃO passamos is_leader - o algoritmo Bully decide quem é líder
+        election_manager.init(replica_sockfd, server_id, false);  // ← Todos iniciam como follower
+        election_manager.setLeaderChangeCallback(onLeaderChange);
+
+        // === CONFIGURAÇÃO HARDCODED: 4 SERVIDORES (1 primário + 3 backups) ===
+        // Cada servidor conhece todos os outros
+        if (server_id != 1) {
+            election_manager.addReplica(1, "127.0.0.1", 5001);
+            replication_manager.addReplica(1, "127.0.0.1", 5001);
+        }
+        if (server_id != 2) {
+            election_manager.addReplica(2, "127.0.0.1", 5002);
+            replication_manager.addReplica(2, "127.0.0.1", 5002);
+        }
+        if (server_id != 3) {
+            election_manager.addReplica(3, "127.0.0.1", 5003);
+            replication_manager.addReplica(3, "127.0.0.1", 5003);
+        }
+        if (server_id != 4) {
+            election_manager.addReplica(4, "127.0.0.1", 5004);
+            replication_manager.addReplica(4, "127.0.0.1", 5004);
+        }
+
+        // Inicializa replication_manager (todos iniciam como NOT leader)
+        replication_manager.init(replica_sockfd, server_id, false);
+
+        // === INICIA MÓDULOS ===
+        election_manager.start();  // ← Aqui o Bully determina quem é líder!
         server_interface.start();
 
-        // Cria instâncias dos handlers
+        // Handlers
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
 
-        // === CLIENTE FAKE PARA TESTE ===
-       // Adicionamos em TODOS (Líder e Backups) para garantir que todos
-        // partam do mesmo estado inicial sem depender da rede.
+        // Cliente fake (estado inicial comum)
         const string FAKE_CLIENT_IP = "10.0.0.2"; 
-        
         if (server_db.addClient(FAKE_CLIENT_IP)) {
-            // IMPORTANTE: Atualize o sumário para contabilizar o saldo inicial desse cliente
             server_db.updateBankSummary(); 
-            log_message(("SUCCESS: Added hardcoded client " + FAKE_CLIENT_IP + " (Initial State).\n").c_str());
-        } else {
-            log_message("WARNING: Fake client already existed.");
+            log_message(("Added fake client " + FAKE_CLIENT_IP).c_str());
         }
-        // Inicia o loop principal do servidor
-        runServerLoop(sockfd, discovery_handler, processing_handler);
 
-        // Para a interface ao encerrar
+        log_message("=== Server ready. Waiting for messages... ===");
+
+        // Loop principal (recebe mensagens de clientes E outras réplicas)
+        runServerLoop(replica_sockfd, discovery_handler, processing_handler);
+
+        // Cleanup
+        election_manager.stop();
         server_interface.stop();
-        close(sockfd);
+        close(client_sockfd);
+        close(replica_sockfd);
 
     } catch (const exception& e) {
-        cerr << "Server Error: " << e.what() << endl;
-        return 1;
+        cerr << "Fatal error: " << e.what() << endl;
     }
-
+    
     return 0;
 }

@@ -4,12 +4,21 @@
 #include <vector>
 #include <string>
 #include <netinet/in.h>
-#include "../common/protocol.h"
+#include "common/protocol.h"
+#include "server/database.h"
+#include "server/interface.h"
+#include "common/utils.h"
+#include <cstring>
+#include <iostream>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+using namespace std;
 
 // Estrutura para guardar info das outras réplicas
 struct ReplicaInfo {
     int id;
-    std::string ip;
+    string ip;
     int port;
     struct sockaddr_in addr;
     bool active;
@@ -17,7 +26,7 @@ struct ReplicaInfo {
 
 class ReplicationManager {
 private:
-    std::vector<ReplicaInfo> replicas;
+    vector<ReplicaInfo> replicas;
     int my_id;
     int sockfd; // Socket UDP compartilhado
     bool is_leader_flag;
@@ -29,18 +38,20 @@ public:
     void init(int socket, int id, bool leader_status);
     
     // MUDAR DEPOIS!!! Adiciona servidores conhecidos (hardcoded por enquanto)
-    void addReplica(int id, std::string ip, int port);
+    void addReplica(int id, string ip, int port);
 
     // Getters/Setters
     bool isLeader() const { return is_leader_flag; }
     void setLeader(bool status) { is_leader_flag = status; }
 
     // [LÍDER] Tenta replicar para os backups e espera ACK
-    bool replicateTransaction(const std::string& origin_ip, const std::string& dest_ip, uint32_t amount, uint32_t seqn);
-    bool replicateNewClient(const std::string& client_ip);
+    bool replicateTransaction(const string& origin_ip, const string& dest_ip, uint32_t amount, uint32_t seqn);
+    bool replicateNewClient(const string& client_ip);
 
     // [BACKUP] Recebe ordem do líder e aplica no DB
     void handleReplicationMessage(const Packet& pkt, const struct sockaddr_in& sender_addr);
 };
+
+extern ReplicationManager replication_manager;
 
 #endif

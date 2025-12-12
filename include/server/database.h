@@ -1,3 +1,6 @@
+#ifndef SERVER_DATABASE_H
+#define SERVER_DATABASE_H
+
 #include <unordered_map>
 #include <mutex>
 #include <string>
@@ -95,3 +98,5 @@ public:
 
 // Instância única do banco de dados do servidor
 extern ServerDatabase server_db;
+
+#endif // SERVER_DATABASE_H

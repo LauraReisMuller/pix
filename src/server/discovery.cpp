@@ -1,8 +1,4 @@
 #include "server/discovery.h"
-#include "common/protocol.h"
-#include "server/database.h"
-#include "common/utils.h"
-#include "server/replication.h" 
 
 extern ReplicationManager replication_manager;
 
