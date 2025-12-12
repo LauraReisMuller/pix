@@ -41,7 +41,7 @@ private:
 
     // === Réplicas conhecidas ===
     vector<ReplicaInfo> replicas;
-    mutable mutex replicas_mutex;
+    mutable recursive_mutex replicas_mutex;
     
     // === Estado da eleição ===
     atomic<ElectionState> state;

@@ -32,7 +32,7 @@ void ElectionManager::init(int socket, int id, bool is_leader) {
 }
 
 void ElectionManager::addReplica(int id, string ip, int port) {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);
     
     ReplicaInfo replica;
     replica.id = id;
@@ -69,7 +69,7 @@ void ElectionManager::start() {
     running = true;
     
     // Assume que o servidor com menor ID é o líder inicial
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);
     int lowest_id;
 
     try {
@@ -93,6 +93,8 @@ void ElectionManager::start() {
     } else {
         current_leader_id = lowest_id;
         state = FOLLOWER;
+        lock_guard<mutex> lock(heartbeat_mutex);
+        last_heartbeat_from_leader = steady_clock::now();
         log_message(("Starting as FOLLOWER. Expected leader: " + to_string(lowest_id)).c_str());
     }
     
@@ -126,7 +128,7 @@ void ElectionManager::heartbeatLoop() {
     while (running) {
         if (state == LEADER) {
             // Líder envia heartbeats para todos
-            lock_guard<mutex> lock(replicas_mutex);
+            lock_guard<recursive_mutex> lock(replicas_mutex);;
             
             Packet hb_packet;
             memset(&hb_packet, 0, sizeof(Packet));
@@ -203,7 +205,7 @@ void ElectionManager::startElection() {
     bool found_lower = false;
     
     {
-        lock_guard<mutex> lock(replicas_mutex);
+        lock_guard<recursive_mutex> lock(replicas_mutex);;
         
         // Envia ELECTION para todos os processos com ID menor
         for (auto& replica : replicas) {
@@ -223,7 +225,7 @@ void ElectionManager::startElection() {
 }
 
 void ElectionManager::sendElectionMsg(int target_id) {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     
     auto it = find_if(replicas.begin(), replicas.end(),
                       [target_id](const ReplicaInfo& r) { return r.id == target_id; });
@@ -252,7 +254,7 @@ void ElectionManager::sendElectionMsg(int target_id) {
 }
 
 void ElectionManager::sendOkMsg(int target_id) {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     
     auto it = find_if(replicas.begin(), replicas.end(),
                       [target_id](const ReplicaInfo& r) { return r.id == target_id; });
@@ -277,7 +279,7 @@ void ElectionManager::sendOkMsg(int target_id) {
 }
 
 void ElectionManager::announceCoordinator() {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     
     Packet coord_packet;
     memset(&coord_packet, 0, sizeof(Packet));
@@ -333,7 +335,7 @@ void ElectionManager::becomeFollower(int leader_id) {
 }
 
 bool ElectionManager::hasLowerReplicas() {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     
     for (const auto& replica : replicas) {
         if (replica.id > my_id && replica.active) {
@@ -344,7 +346,7 @@ bool ElectionManager::hasLowerReplicas() {
 }
 
 void ElectionManager::markReplicaDead(int replica_id) {
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     
     auto it = find_if(replicas.begin(), replicas.end(),
                       [replica_id](const ReplicaInfo& r) { return r.id == replica_id; });
@@ -365,12 +367,21 @@ void ElectionManager::handleElectionMessage(const Packet& packet, const struct s
     log_message(("Received ELECTION from " + to_string(candidate_id)).c_str());
     
     if (candidate_id > my_id) {
-        // Eu sou menor, respondo OK e inicio minha própria eleição
-        sendOkMsg(candidate_id);
+        // Recebi de alguém com ID maior (pior que eu).
         
-        if (state != LEADER && !election_in_progress) {
-            log_message("Received ELECTION from lower process. Starting my own election.");
-            startElection();
+        if (state == LEADER) { 
+            // [CORREÇÃO CRÍTICA]
+             // Se eu JÁ sou o líder e um subordinado tentou eleição, 
+             // significa que ele não sabe que eu mando.
+             // Não mando OK. Mando COORDINATOR direto para ele se atualizar.
+             log_message(("Subordinate " + to_string(candidate_id) + " tried election. Re-asserting authority.").c_str());
+             
+             // Reanuncia para todos (ou só para ele)
+             announceCoordinator(); 
+        } else {
+             // Fluxo normal: Respondo OK e tento virar líder
+             sendOkMsg(candidate_id);
+             if (!election_in_progress) startElection();
         }
     }
     // Se candidate_id <= my_id, ignoro (não deveria receber)
@@ -416,7 +427,7 @@ void ElectionManager::handleHeartbeatMessage(const Packet& packet, const struct 
         }
         
         // Marca réplica como ativa
-        lock_guard<mutex> lock(replicas_mutex);
+        lock_guard<recursive_mutex> lock(replicas_mutex);;
         auto it = find_if(replicas.begin(), replicas.end(),
                           [sender_id](const ReplicaInfo& r) { return r.id == sender_id; });
         if (it != replicas.end()) {
@@ -441,7 +452,7 @@ void ElectionManager::handleHeartbeatAck(const Packet& packet, const struct sock
     int sender_id = packet.heartbeat.sender_id;
     
     // Marca réplica como ativa
-    lock_guard<mutex> lock(replicas_mutex);
+    lock_guard<recursive_mutex> lock(replicas_mutex);;
     auto it = find_if(replicas.begin(), replicas.end(),
                       [sender_id](const ReplicaInfo& r) { return r.id == sender_id; });
     if (it != replicas.end()) {
