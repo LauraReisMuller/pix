@@ -65,7 +65,6 @@ bool ReplicationManager::replicateState(const string& origin_ip, const string& d
             sent_count++;
         }
     }
-    cout << " => Sent_count: " << sent_count << endl;
 
     if (sent_count <= 1)
         return true; // Se não tiver nenhum outro servidor, não replica.
@@ -231,9 +230,10 @@ bool ReplicationManager::replicateQuery(const string &client_ip, uint32_t seqn)
 // LÓGICA DO BACKUP
 void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struct sockaddr_in &sender_addr)
 {
-
-    cout << "[DEBUG] Backup recebeu pacote tipo: " << pkt.type << endl;
-
+    // Se este servidor é o líder, ignora mensagens de replicação
+    if (is_leader_flag) {
+        return;
+    }
 
     if (pkt.type == PKT_REP_CLIENT_REQ)
     {
@@ -242,7 +242,6 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
         // Aplica no DB Local do Backup
         server_db.addClient(client_ip);
         server_db.updateBankSummary();
-        cout << "[DEBUG] Criando cliente replicado..." << endl;
         // Envia ACK de volta
         Packet ack;
         ack.type = PKT_REP_CLIENT_ACK;
@@ -271,8 +270,6 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
     // 1. Converte dados de volta (Uint32 -> String)
     string origin_ip = uint32ToIp(pkt.rep.origin_addr);
     string dest_ip = uint32ToIp(pkt.rep.dest_addr);
-
-    cout << "[DEBUG] Atualizacao de transacao de " << origin_ip << " para " << dest_ip << endl;
 
     // Verifica se já processamos essa requisição antes de tentar aplicar no banco
     uint32_t last_processed = server_db.getClientLastReq(origin_ip);

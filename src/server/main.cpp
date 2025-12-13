@@ -284,8 +284,6 @@ int main(int argc, char *argv[])
             log_message(("Added fake client " + FAKE_CLIENT_IP).c_str());
         }
 
-        log_message("=== Server ready. Waiting for messages... ===");
-
         // Crie uma thread separada para lidar com mensagens entre servidores (Eleição/Replicação)
         thread replicationThread([replica_sockfd, &discovery_handler, &processing_handler]()
                                  { runServerLoop(replica_sockfd, discovery_handler, processing_handler); });
@@ -300,7 +298,6 @@ int main(int argc, char *argv[])
         election_manager.start(); // Aqui o Bully determina quem é líder!
 
         // A thread principal fica no loop ouvindo clientes
-        log_message("=== Server ready");
         runServerLoop(client_sockfd, discovery_handler, processing_handler);
 
         election_manager.stop();

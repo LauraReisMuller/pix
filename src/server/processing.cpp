@@ -2,7 +2,6 @@
 
 using namespace std;
 
-
 void sendResponseAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen, 
                      uint32_t seqn_to_send, uint32_t balance, const string& origin_ip,  uint32_t dest_addr, uint32_t value, bool is_query, bool is_dup_oor) {
     Packet ack_packet;

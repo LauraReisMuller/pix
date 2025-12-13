@@ -48,8 +48,8 @@ int main(int argc, char* argv[]) {
     ClientRequest request_manager(server_ip, port); 
     ClientInterface client_interface(request_manager); 
     request_manager.setInterface(&client_interface); 
-    client_interface.start(); 
     client_interface.displayDiscoverySuccess(server_ip);
+    client_interface.start(); 
     
     // 4. Iniciar a Thread de Processamento de Requisições
     // Esta thread será a ÚNICA que chamará sendRequestWithRetry (lógica bloqueante)

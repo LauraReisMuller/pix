@@ -295,12 +295,11 @@ void ElectionManager::announceCoordinator() {
 void ElectionManager::becomeLeader() {
     if (state == LEADER) return;
     
-    log_message("*** BECOMING LEADER ***");
     state = LEADER;
     current_leader_id = my_id;
     election_in_progress = false;
     
-    log_message(("I am now the LEADER (ID " + to_string(my_id) + ")").c_str());
+    log_message_core(("This instance is now the LEADER (ID " + to_string(my_id) + ")").c_str());
 
     announceCoordinator();
     // Notifica via callback

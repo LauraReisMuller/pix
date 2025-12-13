@@ -48,9 +48,6 @@ ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
 
     string brd_ip = getBroadcastAddress();
     _serv_addr.sin_addr.s_addr = inet_addr(brd_ip.c_str());
-    
-    // DEBUG
-    cout << "[DEBUG] Broadcast configurado para: " << brd_ip << endl;
 }
 
 
