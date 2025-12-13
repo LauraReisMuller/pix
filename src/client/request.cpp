@@ -2,10 +2,12 @@
 #include "client/interface.h"
 #include "common/protocol.h"
 #include "common/utils.h"
+#include "client/discovery.h"
 
 // Definicoes para o RRA (timeout/retry)
 #define RRA_TIMEOUT_MS 10
 #define MAX_RETRIES 20000
+#define DISCOVERY_THRESHOLD 5
 
 /*---Construtor e Setup ---*/
 
@@ -83,13 +85,42 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
 {
 
     Packet current_request = initial_request;
+    // Variável para controlar log de "Tentando reconectar..." para não floodar o terminal
+    bool trying_reconnect = false;
 
     for (int retry_count = 0; retry_count < MAX_RETRIES; ++retry_count)
     {
 
-        if (retry_count > 0)
+        if (retry_count > 0 && (retry_count % DISCOVERY_THRESHOLD == 0))
         {
-            // Notificação da retransmissão pode ir para o log ou para a interface
+            if (!trying_reconnect) {
+                log_message("AVISO: Servidor nao responde. Buscando novo Lider na rede...");
+                trying_reconnect = true;
+            }
+
+            // Instancia a descoberta temporária usando a mesma porta configurada
+            ClientDiscovery temp_discovery(_server_port);
+            string new_leader_ip = temp_discovery.discoverServer();
+
+            if (!new_leader_ip.empty()) {
+                // Se achou alguém, atualiza o endereço de destino
+                // Nota: Pode ser o mesmo IP (se o servidor só estava lento) ou novo (se houve eleição)
+                
+                // Converte string IP para struct in_addr e atualiza _server_addr
+                inet_pton(AF_INET, new_leader_ip.c_str(), &(_server_addr.sin_addr));
+                
+                string msg = "Lider encontrado/confirmado em: " + new_leader_ip;
+                log_message(msg.c_str());
+                
+                trying_reconnect = false; // Reset da flag visual
+            } else {
+                 log_message("AVISO: Nenhum lider encontrado. Tentando novamente...");
+            }
+        }
+
+        if (retry_count > 0 && !trying_reconnect)
+        {
+            // Notificação da retransmissão normal
             string msg = "Retransmitting request ID: " + to_string(current_request.seqn);
             log_message(msg.c_str());
         }
@@ -148,6 +179,12 @@ bool ClientRequest::sendRequestWithRetry(const Packet &initial_request)
             // 4.Validação do ACK
             if (ack_packet.type == PKT_REQUEST_ACK && ack_packet.seqn == current_request.seqn)
             {
+                
+                // Se recebemos ACK de alguém, garantimos que esse IP é o Líder atual.
+                // Isso evita que, se o IP mudou num discover anterior, a gente perca a referência.
+                // (Opcional, mas boa prática de update)
+                _server_addr.sin_addr = from_addr.sin_addr;
+                
                 // Notificar a thread de output da interface
                 AckData ack_data;
                 ack_data.seqn = current_request.seqn;

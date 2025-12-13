@@ -203,21 +203,23 @@ int main(int argc, char* argv[]) {
 
         // === CONFIGURAÇÃO HARDCODED: 4 SERVIDORES (1 primário + 3 backups) ===
         // Cada servidor conhece todos os outros
-        if (server_id != 1) {
-            election_manager.addReplica(1, "127.0.0.1", 5001);
-            replication_manager.addReplica(1, "127.0.0.1", 5001);
-        }
-        if (server_id != 2) {
-            election_manager.addReplica(2, "127.0.0.1", 5002);
-            replication_manager.addReplica(2, "127.0.0.1", 5002);
-        }
-        if (server_id != 3) {
-            election_manager.addReplica(3, "127.0.0.1", 5003);
-            replication_manager.addReplica(3, "127.0.0.1", 5003);
-        }
-        if (server_id != 4) {
-            election_manager.addReplica(4, "127.0.0.1", 5004);
-            replication_manager.addReplica(4, "127.0.0.1", 5004);
+        int total_servers = 4;
+        int docker_replica_port = 5000; 
+
+        for (int i = 1; i <= total_servers; i++) {
+            // Eu não me adiciono na minha própria lista de réplicas
+            if (i == my_id) continue;
+
+            // Monta o IP: "10.0.0.1", "10.0.0.2", etc.
+            string ip = "10.0.0." + to_string(i);
+            
+            // Adiciona tanto no Gerenciador de Eleição quanto no de Replicação
+            // Nota: No Docker, usamos a mesma porta (5000) para todos
+            election_manager.addReplica(i, ip, docker_replica_port);
+            replication_manager.addReplica(i, ip, docker_replica_port);
+            
+            // Log para debug (opcional)
+            // cout << "Configured peer " << i << " at " << ip << ":" << docker_replica_port << endl;
         }
 
         // Inicializa replication_manager (todos iniciam como NOT leader)
