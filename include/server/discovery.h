@@ -12,6 +12,7 @@ class ServerDiscovery {
 public:
     void sendDiscoveryAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen);
     void handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen, int sockfd);
+    void sendServerBroadcast(int sockfd, int my_id, int my_replica_port);
 };
 
 #endif // SERVER_DISCOVERY_H

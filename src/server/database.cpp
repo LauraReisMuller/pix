@@ -274,3 +274,11 @@ uint32_t ServerDatabase::getTotalBalance() const {
 
     return total;
 }
+
+void ServerDatabase::forceClientBalance(const string& ip, uint32_t new_balance) {
+    WriteGuard lock(client_table_lock);
+    auto it = client_table.find(ip);
+    if (it != client_table.end()) {
+        it->second.balance = new_balance; // Sobrescreve sem validar
+    }
+}

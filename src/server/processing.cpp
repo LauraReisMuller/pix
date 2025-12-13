@@ -105,35 +105,40 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         //Se for Backup, ignora silenciosamente (return)
         if (!replication_manager.isLeader()) return;
 
-        //Prepara IP destino
-        char dest_ip_temp[INET_ADDRSTRLEN];
-        struct in_addr dest_addr_struct;
-        dest_addr_struct.s_addr = packet.req.dest_addr;
-        inet_ntop(AF_INET, &dest_addr_struct, dest_ip_temp, INET_ADDRSTRLEN);
-        dest_ip_str_cpp = string(dest_ip_temp);
+        // 1. O Líder Executa LOCALMENTE primeiro!
+        // (Sua makeTransaction já valida saldo e cliente, então se falhar, retorna false)
+        bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
 
-        //Tenta replicar
-        bool replicated = replication_manager.replicateTransaction(
-            origin_ip_str, 
-            dest_ip_str_cpp, 
-            packet.req.value, 
-            packet.seqn
+        if (!success) {
+            log_message("Transação recusada localmente (Saldo/Cliente). Não vou replicar.");
+            // Manda NACK pro cliente
+            uint32_t current_bal = server_db.getClientBalance(origin_ip_str);
+            sendResponseAck(sockfd, client_addr, clilen, received_seqn, current_bal, 
+                            origin_ip_str, packet.req.dest_addr, packet.req.value, false, false);
+            return;
+        }
+
+        // 2. Coletar o "Estado Atualizado" (Como pede o slide)
+        uint32_t bal_orig = server_db.getClientBalance(origin_ip_str);
+        uint32_t bal_dest = server_db.getClientBalance(dest_ip_str_cpp);
+
+        // 3. Replicar o ESTADO (não a operação)
+        // Criamos uma nova função que aceita os saldos
+        bool replicated = replication_manager.replicateState(
+            origin_ip_str, dest_ip_str_cpp, 
+            packet.req.value, packet.seqn,
+            bal_orig, bal_dest // <--- Passamos o gabarito
         );
 
         if (!replicated) {
-            //Se falhou a replicação, abortamos tudo
-            log_message("ERRO: Falha ao replicar. Abortando transação.");
-            return; 
+            log_message("AVISO: Falha ao replicar estado para backups.");
+            // Como já comitamos localmente, seguimos a vida (Soft Consistency)
         }
-
-        //Se replicou, aplica localmente 
-        bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
-        uint32_t balance = server_db.getClientBalance(origin_ip_str);
-        final_balance = (balance >= 0 ? balance : 0);
-
-        if (!success) {
-            log_message("Transação recusada por saldo insuficiente ou erro de validação.");
-        }
+        
+        // 4. Responder ao Cliente
+        final_balance = bal_orig;
+        sendResponseAck(sockfd, client_addr, clilen, received_seqn, final_balance, 
+                            origin_ip_str, packet.req.dest_addr, packet.req.value, is_query, false);
     }
     
     // --- 3. ENVIO DO ACK DE SUCESSO/EXECUÇÃO ---

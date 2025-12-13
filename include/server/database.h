@@ -94,6 +94,8 @@ public:
     void updateBankSummary();
     
     uint32_t getTotalBalance() const;
+
+    void forceClientBalance(const string& ip, uint32_t new_balance); 
 };
 
 // Instância única do banco de dados do servidor

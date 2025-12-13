@@ -16,13 +16,13 @@ services:
   # 2. Servidor com ID 1
   servidor-1:
     <<: *servidor-base
-    command: ./servidor.exe 1 4000 5000
+    command: ./servidor.exe 4000 5000
     container_name: servidor-1
 
   # 3. Servidor com ID 2
   servidor-2:
     <<: *servidor-base
-    command: ./servidor.exe 2 4000 5001
+    command: ./servidor.exe 4000 5000
     container_name: servidor-2
 
   # Clientes (Mantemos fixos para facilitar o 'attach' nos testes)

@@ -34,6 +34,23 @@ void ElectionManager::init(int socket, int id, bool is_leader) {
 void ElectionManager::addReplica(int id, string ip, int port) {
     lock_guard<recursive_mutex> lock(replicas_mutex);
     
+    // 1. VERIFICAÇÃO DE DUPLICIDADE
+    // Percorre a lista para ver se esse ID já existe
+    for (auto& replica : replicas) {
+        if (replica.id == id) {
+            // Já conhecemos esse servidor.
+            // Opcional: Se quiser suportar mudança de IP (ex: container reiniciou),
+            // você poderia atualizar o IP/Porta aqui.
+            // Para este trabalho, apenas ignorar ou marcar como ativo é suficiente.
+            
+            if (!replica.active) {
+                replica.active = true;
+                log_message(("Reactivated known replica ID " + to_string(id)).c_str());
+            }
+            return; // Sai da função sem adicionar duplicata
+        }
+    }
+    
     ReplicaInfo replica;
     replica.id = id;
     replica.ip = ip;

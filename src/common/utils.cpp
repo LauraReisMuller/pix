@@ -39,3 +39,55 @@ string uint32ToIp(uint32_t ip_int) {
 
     return string(ip_str); 
 }
+
+
+int getIdFromIP(const string& ip_str) {
+    struct in_addr addr;
+    
+    if (inet_pton(AF_INET, ip_str.c_str(), &addr) != 1) {
+        log_message("ERROR: Invalid IP format in getIdFromIP.");
+        return -1;
+    }
+    
+    // Extrai o último byte do endereço IP
+    // addr.s_addr está em network byte order (big endian)
+    // Convertemos para host byte order e pegamos os últimos 8 bits
+    uint32_t ip_host = ntohl(addr.s_addr);
+    return ip_host & 0xFF; // Último byte
+}
+
+// Função para obter o IP local da interface de rede
+string getMyIP() {
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        log_message("ERROR: Failed to create socket in getMyIP.");
+        return "";
+    }
+    
+    // Conecta a um endereço externo (não envia dados, apenas para descobrir a interface)
+    struct sockaddr_in serv;
+    memset(&serv, 0, sizeof(serv));
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = inet_addr("8.8.8.8"); // DNS do Google
+    serv.sin_port = htons(53);
+    
+    if (connect(sock, (const struct sockaddr*)&serv, sizeof(serv)) < 0) {
+        close(sock);
+        log_message("ERROR: Failed to connect in getMyIP.");
+        return "";
+    }
+    
+    struct sockaddr_in name;
+    socklen_t namelen = sizeof(name);
+    if (getsockname(sock, (struct sockaddr*)&name, &namelen) < 0) {
+        close(sock);
+        log_message("ERROR: Failed to get socket name in getMyIP.");
+        return "";
+    }
+    
+    char buffer[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &name.sin_addr, buffer, INET_ADDRSTRLEN);
+    
+    close(sock);
+    return string(buffer);
+}

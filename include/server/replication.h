@@ -30,6 +30,7 @@ private:
     int my_id;
     int sockfd; // Socket UDP compartilhado
     bool is_leader_flag;
+    mutable std::mutex replicas_mutex;
 
 public:
     ReplicationManager();
@@ -45,7 +46,9 @@ public:
     void setLeader(bool status) { is_leader_flag = status; }
 
     // [LÍDER] Tenta replicar para os backups e espera ACK
-    bool replicateTransaction(const string& origin_ip, const string& dest_ip, uint32_t amount, uint32_t seqn);
+    bool replicateState(const string& origin_ip, const string& dest_ip, 
+                                        uint32_t amount, uint32_t seqn,
+                                        uint32_t final_bal_orig, uint32_t final_bal_dest);
     bool replicateNewClient(const string& client_ip);
 
     // [BACKUP] Recebe ordem do líder e aplica no DB

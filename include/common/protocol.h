@@ -25,6 +25,9 @@ typedef struct {
     uint32_t origin_addr; // IP de quem pagou
     uint32_t dest_addr;   // IP de quem recebeu
     uint32_t value;       // Valor
+
+    uint32_t final_balance_origin; 
+    uint32_t final_balance_dest;
 } ReplicationData;
 
 typedef enum {
@@ -43,6 +46,9 @@ typedef enum {
     PKT_COORDINATOR,   // Coordenador eleito (Servidor Backup -> Servidores Backups)
     PKT_HEARTBEAT,     // Batimento cardíaco (Servidor Backup -> Servidores Backups)
     PKT_HEARTBEAT_ACK, // Resposta ao batimento cardíaco (Servidor Backup -> Servidores Backups)
+
+    PKT_SERVER_DISCOVER,    //Descoberta de servidores
+    PKT_SERVER_DISCOVER_ACK
 } PacketType;
 
 typedef struct {
@@ -71,6 +77,12 @@ typedef struct {
     uint8_t is_primary;
 } HeartbeatData;
 
+//Dados para descoberta de servidor
+typedef struct {
+    int32_t id;           // ID do servidor (ex: 1, 2, 3...)
+    int32_t replica_port; // Porta onde ele escuta réplicas (ex: 5000)
+} ServerDiscoveryData;
+
 // Estrutura de Pacote Genérico
 typedef struct {
     uint16_t type;    // Tipo do pacote (PKT_REQUEST, PKT_ACK, etc.)
@@ -86,6 +98,7 @@ typedef struct {
         ElectionOkData election_ok;
         CoordinatorData coordinator;
         HeartbeatData heartbeat;
+        ServerDiscoveryData server_discovery;
     };
 
 } Packet;
