@@ -69,7 +69,6 @@ typedef struct {
     uint32_t coordinator_id;
     uint32_t coordinator_addr;
     uint16_t coordinator_port;
-    uint32_t timestamp;
 } CoordinatorData;
 
 typedef struct {

@@ -53,7 +53,7 @@ void ServerDiscovery::sendServerBroadcast(int sockfd, int my_id, int my_replica_
     pkt.server_discovery.id = my_id;
     pkt.server_discovery.replica_port = my_replica_port;
 
-    // 3. Configura endereço de destino (255.255.255.255)
+    // 3. Configura endereço de destino
     struct sockaddr_in broadcast_addr;
     memset(&broadcast_addr, 0, sizeof(broadcast_addr));
     broadcast_addr.sin_family = AF_INET;

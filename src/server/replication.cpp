@@ -9,22 +9,10 @@ void ReplicationManager::init(int socket, int id, bool is_leader)
     this->sockfd = socket;
     this->my_id = id;
     this->is_leader_flag = is_leader;
-
-    /*
-    // --- CONFIGURAÇÃO HARDCODED (Até o Max fazer a Descoberta) ---
-    // Ajuste esses IPs/Portas conforme o seu docker-compose ou teste local
-    if (my_id == 0) { // Assumindo Líder na porta 4000
-        addReplica(1, "127.0.0.1", 4001); // Backup 1
-        // addReplica(2, "127.0.0.1", 4002); // Backup 2 (se houver)
-    } else {
-        addReplica(0, "127.0.0.1", 4000); // Líder
-    }
-    */
 }
 
 void ReplicationManager::addReplica(int id, string ip, int port)
 {
-    // [NOVO] Protege a lista
     lock_guard<mutex> lock(replicas_mutex);
 
     // 1. VERIFICAÇÃO DE DUPLICIDADE
@@ -32,12 +20,11 @@ void ReplicationManager::addReplica(int id, string ip, int port)
     {
         if (r.id == id)
         {
-            // Já existe, não faz nada
             return;
         }
     }
 
-    // 2. ADIÇÃO
+    // 2. Adição de novo servidor de réplica
     ReplicaInfo r;
     r.id = id;
     r.ip = ip;
@@ -50,11 +37,9 @@ void ReplicationManager::addReplica(int id, string ip, int port)
     inet_pton(AF_INET, ip.c_str(), &r.addr.sin_addr);
 
     replicas.push_back(r);
-
-    // cout << "ReplicationManager: Added replica " << id << endl;
 }
 
-// --- LÓGICA DO LÍDER ---
+// LÓGICA DO LÍDER
 bool ReplicationManager::replicateState(const string& origin_ip, const string& dest_ip, 
                                         uint32_t amount, uint32_t seqn,
                                         uint32_t final_bal_orig, uint32_t final_bal_dest) {
@@ -67,8 +52,6 @@ bool ReplicationManager::replicateState(const string& origin_ip, const string& d
     pkt.rep.origin_addr = ipToUint32(origin_ip);
     pkt.rep.dest_addr   = ipToUint32(dest_ip);
     pkt.rep.value       = amount;
-    
-    // [NOVO] Enviando o gabarito
     pkt.rep.final_balance_origin = final_bal_orig;
     pkt.rep.final_balance_dest   = final_bal_dest;
 
@@ -85,7 +68,7 @@ bool ReplicationManager::replicateState(const string& origin_ip, const string& d
     cout << " => Sent_count: " << sent_count << endl;
 
     if (sent_count <= 1)
-        return true; // Sem réplicas? Sucesso imediato (modo degradado)
+        return true; // Se não tiver nenhum outro servidor, não replica.
 
     int acks_received = 0;
     Packet response;
@@ -103,13 +86,11 @@ bool ReplicationManager::replicateState(const string& origin_ip, const string& d
     FD_SET(sockfd, &readfds);
 
     // O select espera até que o socket tenha dados para ler OU o tempo acabe.
-    // Ele NÃO altera o socket globalmente, então a Main Thread não sofre.
     int rv = select(sockfd + 1, &readfds, NULL, NULL, &tv);
 
     if (rv > 0)
     {
-        // Chegou dados! Tenta ler sem bloquear (MSG_DONTWAIT)
-        // Usamos MSG_DONTWAIT para garantir que não vamos travar se a main thread ler o pacote antes de nós.
+        // Chegou dados, tenta ler sem bloquear (MSG_DONTWAIT)
         ssize_t n = recvfrom(sockfd, &response, sizeof(Packet), MSG_DONTWAIT, (struct sockaddr *)&from_addr, &len);
 
         if (n > 0 && response.type == PKT_REPLICATION_ACK && response.seqn == seqn)
@@ -117,7 +98,6 @@ bool ReplicationManager::replicateState(const string& origin_ip, const string& d
             acks_received++;
         }
     }
-    // Se rv == 0, foi timeout do select. Se rv < 0, foi erro do select.
 
     return (acks_received >= 1);
 }
@@ -132,15 +112,14 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
     pkt.type = PKT_REP_CLIENT_REQ;
     pkt.seqn = 0; // ID irrelevante para criação
 
-    // Reaproveitamos a struct ReplicationData!
-    // Usamos o campo 'origin_addr' para guardar o IP do novo cliente
+    // Usa o campo 'origin_addr' para guardar o IP do novo cliente
     pkt.rep.origin_addr = ipToUint32(client_ip);
-    pkt.rep.dest_addr = 0; // Não usado
-    pkt.rep.value = -1;     // O valor do novo cliente é -1.
+    pkt.rep.dest_addr = 0;
+    pkt.rep.value = 0;
 
     int sent_count = 0;
 
-    // Envia para todas as réplicas (Lógica idêntica ao replicateTransaction)
+    // Envia para todas as réplicas
     for (const auto &r : replicas)
     {
         if (r.active)
@@ -151,7 +130,7 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
     }
 
     if (sent_count <= 1)
-        return true; // Sem réplicas? Sucesso imediato
+        return true; // Sem outros servidores não necessita replicação
 
     // Configura a espera pelo ACK
     int acks_received = 0;
@@ -174,10 +153,10 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
 
     if (rv > 0)
     {
-        // Chegou dados! Tenta ler sem bloquear (MSG_DONTWAIT)
+        // Chegaram dados, tenta ler sem bloquear (MSG_DONTWAIT)
         ssize_t n = recvfrom(sockfd, &response, sizeof(Packet), MSG_DONTWAIT, (struct sockaddr *)&from_addr, &len);
 
-        // AQUI MUDA: Verificamos se é o ACK de CRIAÇÃO DE CLIENTE (PKT_REP_CLIENT_ACK)
+        // Verifica se é ACK de CRIAÇÃO DE CLIENTE (PKT_REP_CLIENT_ACK)
         if (n > 0 && response.type == PKT_REP_CLIENT_ACK)
         {
             acks_received++;
@@ -194,11 +173,11 @@ bool ReplicationManager::replicateQuery(const string &client_ip, uint32_t seqn)
 
     Packet pkt;
     memset(&pkt, 0, sizeof(Packet));
-    pkt.type = PKT_REP_QUERY_REQ; // Define o tipo correto para QUERY
+    pkt.type = PKT_REP_QUERY_REQ;   // Define o tipo correto para QUERY
     pkt.seqn = seqn;                // O ID da requisição é crucial aqui
     pkt.rep.origin_addr = ipToUint32(client_ip);
     pkt.rep.dest_addr = 0;          // Não usado em query
-    pkt.rep.value = 0;              // Valor 0
+    pkt.rep.value = 0;
 
     int sent_count = 0;
 
@@ -212,7 +191,7 @@ bool ReplicationManager::replicateQuery(const string &client_ip, uint32_t seqn)
         }
     }
 
-    // Se não houver réplicas (ou só o líder na rede), retorna sucesso imediato
+    // Se não houver réplicas (ou só o líder na rede), retorna
     if (sent_count <= 1)
         return true; 
 
@@ -245,11 +224,11 @@ bool ReplicationManager::replicateQuery(const string &client_ip, uint32_t seqn)
         }
     }
 
-    // Retorna true se pelo menos 1 backup confirmou (Soft Consistency)
+    // Retorna true se pelo menos 1 backup confirmou
     return (acks_received >= 1);
 }
 
-// --- LÓGICA DO BACKUP ---
+// LÓGICA DO BACKUP
 void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struct sockaddr_in &sender_addr)
 {
 
@@ -271,19 +250,19 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
     }
 
     if (pkt.type == PKT_REP_QUERY_REQ){
-        // [CORREÇÃO] Converter uint32 para string antes de passar ao banco
+        // Converter uint32 para string antes de passar ao banco
         string client_ip = uint32ToIp(pkt.rep.origin_addr);
         
-        // Atualiza apenas o número de sequência (evita replay attack se virar líder)
+        // Atualiza apenas o número de sequência
         server_db.updateClientLastReq(client_ip, pkt.seqn);
         
         Packet ack;
-        memset(&ack, 0, sizeof(Packet)); // Sempre bom zerar
+        memset(&ack, 0, sizeof(Packet));
         ack.type = PKT_REP_QUERY_ACK;
-        ack.seqn = pkt.seqn; // É importante devolver o seqn para o Líder validar
+        ack.seqn = pkt.seqn; // Devolve o seqn para o Líder validar
         
         sendto(sockfd, &ack, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, sizeof(sender_addr));
-        return; // Retorna para não cair no fluxo de transação abaixo
+        return;
     }
 
     if (pkt.type != PKT_REPLICATION_REQ)
@@ -300,10 +279,7 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
 
     if (pkt.seqn <= last_processed)
     {
-        // Já processamos! Não executamos makeTransaction de novo.
-        // Apenas enviamos o ACK novamente para garantir que o Líder receba.
-        // [Opcional] cout << "[DEBUG] Backup ignorando duplicata ID " << pkt.seqn << endl;
-
+        // Já processado, apenas envia o ACK novamente para garantir que o Líder receba.
         log_message("Mensagem de atualização duplicada. Atualização já efetuada");
         Packet ack;
         memset(&ack, 0, sizeof(Packet));
@@ -313,21 +289,12 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
         return;
     }
 
-    // --- APLICAÇÃO PASSIVA DO ESTADO ---
-    // O Backup não usa "makeTransaction" (que calcula). 
-    // Ele usa "applyState" (que obedece).
-    
-    // Você precisará criar esse método simples no Database ou usar os setters unsafe
+    // APLICAÇÃO PASSIVA DO ESTADO
+    // O Backup usa "applyState"
     server_db.forceClientBalance(origin_ip, pkt.rep.final_balance_origin);
     server_db.forceClientBalance(dest_ip, pkt.rep.final_balance_dest);
-    
-    // Adiciona no histórico apenas para registro
     server_db.addTransaction_unsafe(origin_ip, pkt.seqn, dest_ip, pkt.rep.value);
-    
-    // Atualiza last_req
     server_db.updateClientLastReq_unsafe(origin_ip, pkt.seqn);
-    
-    // Atualiza resumo
     server_db.updateBankSummary_unsafe();
 
     string msg_log = "client " + origin_ip + 
@@ -335,7 +302,6 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
                      " dest " + dest_ip + 
                      " value " + to_string(pkt.rep.value);
     
-    // Isso vai fazer o ServerInterface imprimir a linha acima E o resumo (num_transactions, balance...)
     server_interface.notifyUpdate(msg_log);
 
     // Envia ACK

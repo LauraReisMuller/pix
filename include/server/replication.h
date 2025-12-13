@@ -28,7 +28,7 @@ class ReplicationManager {
 private:
     vector<ReplicaInfo> replicas;
     int my_id;
-    int sockfd; // Socket UDP compartilhado
+    int sockfd;
     bool is_leader_flag;
     mutable std::mutex replicas_mutex;
 
@@ -37,8 +37,7 @@ public:
     
     // Inicializa com ID e Socket
     void init(int socket, int id, bool leader_status);
-    
-    // MUDAR DEPOIS!!! Adiciona servidores conhecidos (hardcoded por enquanto)
+
     void addReplica(int id, string ip, int port);
 
     // Getters/Setters
@@ -53,7 +52,7 @@ public:
 
     bool replicateQuery(const string &client_ip, uint32_t seqn);
 
-    // [BACKUP] Recebe ordem do líder e aplica no DB
+    // [RÉPLICA] Recebe ordem do líder e aplica no DB
     void handleReplicationMessage(const Packet& pkt, const struct sockaddr_in& sender_addr);
 };
 

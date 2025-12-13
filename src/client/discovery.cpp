@@ -28,7 +28,6 @@ string getBroadcastAddress() {
                         inet_ntop(AF_INET, ptr, buffer, INET_ADDRSTRLEN);
                         
                         broadcastAddr = string(buffer);
-                        // Geralmente a primeira interface válida (eth0) é a que queremos
                         break; 
                     }
                 }
@@ -42,21 +41,20 @@ string getBroadcastAddress() {
 
 ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
 
-    // inicializa a estrutura de endereço do servidor para o broadcast
+    // Inicializa a estrutura de endereço do servidor para o broadcast
     memset(&_serv_addr, 0, sizeof(_serv_addr));
     _serv_addr.sin_family = AF_INET;
     _serv_addr.sin_port = htons(_port);
 
-    // [MODIFICAÇÃO] Busca o IP de Broadcast real da rede
     string brd_ip = getBroadcastAddress();
     _serv_addr.sin_addr.s_addr = inet_addr(brd_ip.c_str());
     
-    // Log para você saber o que está acontecendo
+    // DEBUG
     cout << "[DEBUG] Broadcast configurado para: " << brd_ip << endl;
 }
 
 
-//Cria o socket UDP e habilita a opção broadcast.
+// Cria o socket UDP e habilita a opção broadcast.
 void ClientDiscovery::setupSocket() {
     _sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (_sockfd < 0) {
@@ -73,7 +71,7 @@ void ClientDiscovery::setupSocket() {
     }
 }
 
-//Espera pela resposta (ACK) do servidor com um timeout.
+// Espera pela resposta (ACK) do servidor com um timeout.
 bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) {
     fd_set read_fds;
     struct timeval tv;
@@ -83,7 +81,6 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
     FD_ZERO(&read_fds);
     FD_SET(_sockfd, &read_fds);
 
-    // Configura o timeout
     tv.tv_sec = DISCOVERY_TIMEOUT_SEC;
     tv.tv_usec = 0;
 
@@ -91,27 +88,22 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
     retval = select(_sockfd + 1, &read_fds, NULL, NULL, &tv);
 
     if (retval == -1) {
-        // Erro na chamada select
         log_message("ERROR in select() during discovery");
         return false;
     } else if (retval == 0) {
-        // Timeout
         log_message("Discovery timeout. Retrying...");
         return false;
     } else {
         // Dados recebidos (sockfd está no read_fds set)
         Packet response_packet;
         
-        // recvfrom receberá a resposta unicast do servidor
         ssize_t n = recvfrom(_sockfd, (char*)&response_packet, sizeof(Packet), 0, 
                              (struct sockaddr*)&server_info, &len);
         
-        //Verifica se o pacote recebido é realmente um ACK de descoberta
         if (response_packet.type != PKT_DISCOVER_ACK) {
             log_message("Received unexpected packet type during discovery. Ignoring.");
             return false;
         }
-        
         if (n < 0) {
             log_message("ERROR on recvfrom during discovery");
             return false;
@@ -120,7 +112,6 @@ bool ClientDiscovery::waitForResponse(sockaddr_in& server_info, socklen_t& len) 
     }
 }
 
-//Realiza o processo de Descoberta.
 string ClientDiscovery::discoverServer() {
     
     try {
@@ -129,10 +120,9 @@ string ClientDiscovery::discoverServer() {
         return ""; 
     }
 
-    // Prepara o pacote de DESCOBERTA
     Packet discovery_packet;
     discovery_packet.type = PKT_DISCOVER;
-    discovery_packet.seqn = 0; // O ID não é relevante para o Descobrimento
+    discovery_packet.seqn = 0;
 
     struct sockaddr_in server_info;
     socklen_t len = sizeof(server_info);
@@ -150,12 +140,9 @@ string ClientDiscovery::discoverServer() {
         
         // 2. Aguarda a resposta (ACK) unicast do servidor com timeout
         if (waitForResponse(server_info, len)) {
-    
-            // Converte o IP para string
             char ip_str[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &server_info.sin_addr, ip_str, INET_ADDRSTRLEN);
             
-            // Fecha o socket e retorna o IP
             close(_sockfd);
             return string(ip_str);
         }

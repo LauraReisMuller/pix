@@ -80,7 +80,7 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
     }
 
 
-    // --- 2. EXECUÇÃO (received_seqn == last_processed_seqn + 1) ---
+    // 2. EXECUÇÃO (received_seqn == last_processed_seqn + 1)
     if (is_query) {
         uint32_t balance = server_db.getClientBalance(origin_ip_str);
         
@@ -109,39 +109,37 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
         }
     } else {
 
-       //Transação real (com replicação)
-        
+        //Transação real (com replicação)
         //Se for Backup, ignora silenciosamente (return)
         if (!replication_manager.isLeader()) return;
 
-        // 1. O Líder Executa LOCALMENTE primeiro!
+        // 1. O Líder Executa localmente primeiro!
         // (Sua makeTransaction já valida saldo e cliente, então se falhar, retorna false)
         bool success = server_db.makeTransaction(origin_ip_str, dest_ip_str_cpp, packet);
 
         if (!success) {
             log_message("Transação recusada localmente (Saldo/Cliente). Não vou replicar.");
-            // Manda NACK pro cliente
+            // Manda "NACK" pro cliente
             uint32_t current_bal = server_db.getClientBalance(origin_ip_str);
             sendResponseAck(sockfd, client_addr, clilen, received_seqn, current_bal, 
                             origin_ip_str, packet.req.dest_addr, packet.req.value, false, false);
             return;
         }
 
-        // 2. Coletar o "Estado Atualizado" (Como pede o slide)
+        // 2. Coletar o "Estado Atualizado"
         uint32_t bal_orig = server_db.getClientBalance(origin_ip_str);
         uint32_t bal_dest = server_db.getClientBalance(dest_ip_str_cpp);
 
-        // 3. Replicar o ESTADO (não a operação)
+        // 3. Replicar o estado
         // Criamos uma nova função que aceita os saldos
         bool replicated = replication_manager.replicateState(
             origin_ip_str, dest_ip_str_cpp, 
             packet.req.value, packet.seqn,
-            bal_orig, bal_dest // <--- Passamos o gabarito
+            bal_orig, bal_dest
         );
 
         if (!replicated) {
             log_message("AVISO: Falha ao replicar estado para backups.");
-            // Como já comitamos localmente, seguimos a vida (Soft Consistency)
         }
         
         // 4. Responder ao Cliente
@@ -150,11 +148,9 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
                             origin_ip_str, packet.req.dest_addr, packet.req.value, is_query, false);
     }
     
-    // --- 3. ENVIO DO ACK DE SUCESSO/EXECUÇÃO ---
     sendResponseAck(sockfd, client_addr, clilen, received_seqn, final_balance, 
                             origin_ip_str, packet.req.dest_addr, packet.req.value, is_query, false);
 
-    // --- 4. NOTIFICA A INTERFACE COM A MENSAGEM DE LOG ---
     string msg_log = "client " + origin_ip_str + 
                      " id_req " + to_string(packet.seqn) +
                      " dest " + dest_ip_str_cpp + 

@@ -1,6 +1,3 @@
-// src/server/election.cpp
-// Implementação do módulo de eleição (Algoritmo Bully)
-
 #include "server/election.h"
 #include "common/utils.h"
 #include <arpa/inet.h>
@@ -11,11 +8,6 @@
 
 ElectionManager election_manager;
 
-// ============================================================================
-// CONFIGURAÇÃO
-// ============================================================================
-
-// Método init - configura os valores reais
 void ElectionManager::init(int socket, int id, bool is_leader) {
     this->sockfd = socket;
     this->my_id = id;
@@ -25,7 +17,7 @@ void ElectionManager::init(int socket, int id, bool is_leader) {
         current_leader_id = my_id;
     } else {
         state = FOLLOWER;
-        current_leader_id = 0; // Desconhecido inicialmente
+        current_leader_id = 0; // Desconhecido inicialmente. Servidores começam como follower.
     }
     
     log_message(("ElectionManager initialized for server ID " + to_string(my_id)).c_str());
@@ -38,16 +30,12 @@ void ElectionManager::addReplica(int id, string ip, int port) {
     // Percorre a lista para ver se esse ID já existe
     for (auto& replica : replicas) {
         if (replica.id == id) {
-            // Já conhecemos esse servidor.
-            // Opcional: Se quiser suportar mudança de IP (ex: container reiniciou),
-            // você poderia atualizar o IP/Porta aqui.
-            // Para este trabalho, apenas ignorar ou marcar como ativo é suficiente.
-            
+            // Já conhecemos esse servidor, apenas reativa ele.
             if (!replica.active) {
                 replica.active = true;
                 log_message(("Reactivated known replica ID " + to_string(id)).c_str());
             }
-            return; // Sai da função sem adicionar duplicata
+            return;
         }
     }
     
@@ -72,11 +60,6 @@ void ElectionManager::setLeaderChangeCallback(ElectionCallback callback) {
     on_leader_change = callback;
 }
 
-
-// ============================================================================
-// CONTROLE DO MÓDULO
-// ============================================================================
-
 void ElectionManager::start() {
     if (running) {
         log_message("ElectionManager already running.");
@@ -85,7 +68,7 @@ void ElectionManager::start() {
     
     running = true;
     
-    // Assume que o servidor com menor ID é o líder inicial
+    // Servidor com menor ID é o líder inicial
     lock_guard<recursive_mutex> lock(replicas_mutex);
     int lowest_id;
 
@@ -115,7 +98,7 @@ void ElectionManager::start() {
         log_message(("Starting as FOLLOWER. Expected leader: " + to_string(lowest_id)).c_str());
     }
     
-    // Inicia threads
+    // Inicia threads de hearbeat e de escuta de eleição
     heartbeat_thread = thread(&ElectionManager::heartbeatLoop, this);
     monitor_thread = thread(&ElectionManager::monitorLoop, this);
     
@@ -137,10 +120,7 @@ void ElectionManager::stop() {
     log_message("ElectionManager stopped.");
 }
 
-// ============================================================================
 // LOOPS DE THREADS
-// ============================================================================
-
 void ElectionManager::heartbeatLoop() {
     while (running) {
         if (state == LEADER) {
@@ -168,6 +148,7 @@ void ElectionManager::heartbeatLoop() {
     }
 }
 
+// Monitora heartbeats, pode inciar eleição e se declara líder de acordo.
 void ElectionManager::monitorLoop() {    
     while (running) {
         if (state == FOLLOWER) {
@@ -185,10 +166,8 @@ void ElectionManager::monitorLoop() {
                 last_heartbeat_from_leader = steady_clock::now(); // Reset
             }
         } else if (state == CANDIDATE) {
-            // Verifica se eleição travou
-            //auto now = steady_clock::now();
             if (election_in_progress) {
-                // Timeout simples - se passou tempo demais, assumir vitória
+                // Timeout de eleição, assume vitória
                 this_thread::sleep_for(milliseconds(ELECTION_TIMEOUT_MS));
 
                 if (election_in_progress) {
@@ -205,10 +184,7 @@ void ElectionManager::monitorLoop() {
     }
 }
 
-// ============================================================================
-// ALGORITMO BULLY - ELEIÇÃO
-// ============================================================================
-
+// ELEIÇÃO COM ALGORITMO VALENTÃO
 void ElectionManager::startElection() {
     if (election_in_progress) {
         log_message("Election already in progress. Ignoring.");
@@ -238,7 +214,6 @@ void ElectionManager::startElection() {
         log_message("No lower processes found. Becoming leader immediately.");
         becomeLeader();
     }
-    // Caso contrário, aguarda timeout no monitorLoop
 }
 
 void ElectionManager::sendElectionMsg(int target_id) {
@@ -304,7 +279,6 @@ void ElectionManager::announceCoordinator() {
     coord_packet.coordinator.coordinator_id = my_id;
     coord_packet.coordinator.coordinator_addr = my_addr;
     coord_packet.coordinator.coordinator_port = my_port;
-    coord_packet.coordinator.timestamp = time(nullptr);
     
     // Envia para todos (broadcast)
     for (auto& replica : replicas) {
@@ -328,9 +302,7 @@ void ElectionManager::becomeLeader() {
     
     log_message(("I am now the LEADER (ID " + to_string(my_id) + ")").c_str());
 
-    // Anuncia para todos
     announceCoordinator();
-    
     // Notifica via callback
     if (on_leader_change) {
         on_leader_change(my_id, true);
@@ -374,34 +346,24 @@ void ElectionManager::markReplicaDead(int replica_id) {
     }
 }
 
-// ============================================================================
 // HANDLERS DE MENSAGENS
-// ============================================================================
-
 void ElectionManager::handleElectionMessage(const Packet& packet, const struct sockaddr_in& sender) {
     int candidate_id = packet.election.candidate_id;
     
     log_message(("Received ELECTION from " + to_string(candidate_id)).c_str());
     
-    if (candidate_id > my_id) {
-        // Recebi de alguém com ID maior (pior que eu).
-        
+    // Servidor candidato pior do que esse
+    if (my_id < candidate_id) {
         if (state == LEADER) { 
-            // [CORREÇÃO CRÍTICA]
-             // Se eu JÁ sou o líder e um subordinado tentou eleição, 
-             // significa que ele não sabe que eu mando.
-             // Não mando OK. Mando COORDINATOR direto para ele se atualizar.
+             // Já é líder e um subordinado tentou eleição, manda COORDINATOR novamente.
              log_message(("Subordinate " + to_string(candidate_id) + " tried election. Re-asserting authority.").c_str());
-             
-             // Reanuncia para todos (ou só para ele)
              announceCoordinator(); 
         } else {
-             // Fluxo normal: Respondo OK e tento virar líder
+             // Responde OK e propaga Election para tentar virar líder
              sendOkMsg(candidate_id);
              if (!election_in_progress) startElection();
         }
     }
-    // Se candidate_id <= my_id, ignoro (não deveria receber)
 }
 
 void ElectionManager::handleOkMessage(const Packet& packet, const struct sockaddr_in& sender) {
@@ -409,7 +371,7 @@ void ElectionManager::handleOkMessage(const Packet& packet, const struct sockadd
     
     log_message(("Received ELECTION_OK from " + to_string(responder_id)).c_str());
     
-    // Alguém maior respondeu, então não sou o líder
+    // Alguém com id menor respondeu, então não é líder
     if (state == CANDIDATE) {
         log_message("Lower process responded. Stepping down from candidacy.");
         state = FOLLOWER;
@@ -477,10 +439,7 @@ void ElectionManager::handleHeartbeatAck(const Packet& packet, const struct sock
     }
 }
 
-// ============================================================================
-// INTERFACE PÚBLICA
-// ============================================================================
-
+// Eleição manual para teste.
 void ElectionManager::triggerElection() {
     log_message("Manual election trigger requested.");
     startElection();

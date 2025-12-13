@@ -19,7 +19,7 @@ int setupServerSocket(int port)
         throw runtime_error("Failed to open socket.");
     }
 
-    // Permite reutilizar a porta (útil para reiniciar o servidor rapidamente)
+    // Permite reutilizar a porta
     int optval = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
 
@@ -27,7 +27,7 @@ int setupServerSocket(int port)
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY; // Escuta em todas as interfaces
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
 
     // Faz bind do socket à porta especificada
@@ -40,7 +40,6 @@ int setupServerSocket(int port)
     return sockfd;
 }
 
-// Callback chamado quando o líder muda
 void onLeaderChange(uint32_t new_leader_id, bool i_am_leader)
 {
     if (i_am_leader)
@@ -68,7 +67,7 @@ void handlePacket(const Packet &packet,
     Packet packet_copy = packet;
     struct sockaddr_in client_addr_copy = client_addr;
 
-    // === DESCOBERTA DE SERVIDORES ===
+    // DESCOBERTA DE SERVIDORES
     if (packet.type == PKT_SERVER_DISCOVER || packet.type == PKT_SERVER_DISCOVER_ACK)
     {
 
@@ -80,37 +79,31 @@ void handlePacket(const Packet &packet,
         inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, INET_ADDRSTRLEN);
         string remote_ip(ip_str);
 
-        // Se for eu mesmo (broadcast volta pra mim), ignoro
-        // Precisamos ter acesso ao my_id aqui.
-        // DICA: Como handlePacket não recebe my_id, verifique se election_manager.getMyId() == remote_id
+        // Se for mensagem do próprio servidor (broadcast voltou), ignora
         if (election_manager.getMyId() == remote_id)
             return;
 
-        // Adiciona aos gerenciadores (ambos têm proteções internas contra duplicidade, mas é bom checar)
+        // Adiciona aos gerenciadores
         election_manager.addReplica(remote_id, remote_ip, remote_port);
         replication_manager.addReplica(remote_id, remote_ip, remote_port);
 
-        // Se for um pedido de descoberta (alguém novo entrou), respondo com ACK (me apresento)
+        // Se for um pedido de descoberta (novo servidor), responde com ACK
         if (packet.type == PKT_SERVER_DISCOVER)
         {
             Packet ack;
             memset(&ack, 0, sizeof(Packet));
             ack.type = PKT_SERVER_DISCOVER_ACK;
             ack.server_discovery.id = election_manager.getMyId();
-            // Assumimos que o my_port é o mesmo que o remote_port se usarmos porta fixa no Docker
-            // Ou precisamos passar o my_replica_port para o handlePacket.
-            // Para simplificar no Docker: remote_port deve ser 5000. Eu respondo dizendo que sou 5000.
             ack.server_discovery.replica_port = remote_port;
 
             sendto(sockfd, &ack, sizeof(Packet), 0, (struct sockaddr *)&client_addr, clilen);
 
-            // Log opcional
             // log_message(("Discovered new server ID " + to_string(remote_id) + ". Sent ACK.").c_str());
         }
         return;
     }
 
-    // === MENSAGENS DE ELEIÇÃO (BULLY) ===
+    // MENSAGENS DE ELEIÇÃO (BULLY)
     if (packet.type >= PKT_ELECTION && packet.type <= PKT_HEARTBEAT_ACK)
     {
         switch (packet.type)
@@ -137,7 +130,7 @@ void handlePacket(const Packet &packet,
         return;
     }
 
-    // === MENSAGENS DE CLIENTE ===
+    // MENSAGENS DE CLIENTE
     switch (packet.type)
     {
     case PKT_DISCOVER:
@@ -145,7 +138,6 @@ void handlePacket(const Packet &packet,
         // Apenas o Líder responde a descoberta de clientes.
         if (election_manager.isLeader())
         {
-            // if (election_manager.isLeader()) {
             discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
         }
         else
@@ -166,7 +158,6 @@ void handlePacket(const Packet &packet,
         else
         {
             log_message("Received PKT_REQUEST but I'm not the leader. Ignoring.");
-            // TODO: Opcionalmente, redirecionar cliente para o líder atual
         }
         break;
 
@@ -184,8 +175,6 @@ void handlePacket(const Packet &packet,
     case PKT_REP_CLIENT_ACK:
     case PKT_REP_QUERY_ACK:
         // ACK de replicação recebido pelo Líder.
-        // Geralmente isso é pego pelo recvfrom dentro do loop de espera do 'replicateTransaction'.
-        // Se cair aqui, é porque chegou atrasado ou duplicado. Apenas ignoramos.
         break;
 
     default:
@@ -220,7 +209,7 @@ void runServerLoop(int sockfd, ServerDiscovery &discovery_handler, ServerProcess
     }
 }
 
-// O servidor deve ser iniciado com: ./servidor <SERVER_ID> <CLIENT_PORT> [REPLICA_PORT]
+// O servidor deve ser iniciado com: ./servidor <CLIENT_PORT>
 int main(int argc, char *argv[])
 {
     if (argc < 2)
@@ -230,11 +219,6 @@ int main(int argc, char *argv[])
         cerr << "  REPLICA_PORT: Port for replica communication (default: CLIENT_PORT+1000)" << endl;
         cerr << "" << endl;
         cerr << "Note: Server ID will be automatically derived from the last byte of the IP address." << endl;
-        cerr << "Example for 1 Primary + 3 Backups:" << endl;
-        cerr << "  Terminal 1: " << argv[0] << " 4001 5001  # Server at x.x.x.1" << endl;
-        cerr << "  Terminal 2: " << argv[0] << " 4002 5002  # Server at x.x.x.2" << endl;
-        cerr << "  Terminal 3: " << argv[0] << " 4003 5003  # Server at x.x.x.3" << endl;
-        cerr << "  Terminal 4: " << argv[0] << " 4004 5004  # Server at x.x.x.4" << endl;
         return 1;
     }
 
@@ -279,45 +263,20 @@ int main(int argc, char *argv[])
         int client_sockfd = setupServerSocket(client_port);
         int replica_sockfd = setupServerSocket(replica_port);
 
-        // === INICIALIZA ELECTION MANAGER ===
-        // NÃO passamos is_leader - o algoritmo Bully decide quem é líder
-        election_manager.init(replica_sockfd, server_id, false); // ← Todos iniciam como follower
+        election_manager.init(replica_sockfd, server_id, false); // Todos iniciam como follower
         election_manager.setLeaderChangeCallback(onLeaderChange);
-
-        /*
-        // === CONFIGURAÇÃO HARDCODED: 4 SERVIDORES (1 primário + 3 backups) ===
-        // Cada servidor conhece todos os outros
-        int total_servers = 4;
-        int docker_replica_port = 5000;
-
-        for (int i = 1; i <= total_servers; i++) {
-            // Eu não me adiciono na minha própria lista de réplicas
-            if (i == server_id) continue;
-
-            // Monta o IP: "10.0.0.1", "10.0.0.2", etc.
-            string ip = "10.0.0." + to_string(i);
-
-            // Adiciona tanto no Gerenciador de Eleição quanto no de Replicação
-            // Nota: No Docker, usamos a mesma porta (5000) para todos
-            election_manager.addReplica(i, ip, docker_replica_port);
-            replication_manager.addReplica(i, ip, docker_replica_port);
-
-            // Log para debug (opcional)
-            // cout << "Configured peer " << i << " at " << ip << ":" << docker_replica_port << endl;
-        }
-        */
 
         // Inicializa replication_manager (todos iniciam como NOT leader)
         replication_manager.init(replica_sockfd, server_id, false);
 
-        // === INICIA MÓDULOS ===
+        // INICIA MÓDULOS
         server_interface.start();
 
         // Handlers
         ServerDiscovery discovery_handler;
         ServerProcessing processing_handler;
 
-        // Cliente fake (estado inicial comum)
+        // Cliente falso para testes (estado inicial comum)
         const string FAKE_CLIENT_IP = "10.0.0.2";
         if (server_db.addClient(FAKE_CLIENT_IP))
         {
@@ -338,13 +297,12 @@ int main(int argc, char *argv[])
         // Chamada limpa e semântica
         discovery_handler.sendServerBroadcast(replica_sockfd, server_id, replica_port);
 
-        election_manager.start(); // ← Aqui o Bully determina quem é líder!
+        election_manager.start(); // Aqui o Bully determina quem é líder!
 
-        // A thread principal fica no loop ouvindo CLIENTES
+        // A thread principal fica no loop ouvindo clientes
         log_message("=== Server ready");
         runServerLoop(client_sockfd, discovery_handler, processing_handler);
 
-        // Cleanup
         election_manager.stop();
         server_interface.stop();
         close(client_sockfd);
