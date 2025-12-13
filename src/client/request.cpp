@@ -5,7 +5,7 @@
 #include "client/discovery.h"
 
 // Definicoes para o RRA (timeout/retry)
-#define RRA_TIMEOUT_MS 10
+#define RRA_TIMEOUT_MS 500
 #define MAX_RETRIES 20000
 #define DISCOVERY_THRESHOLD 5
 

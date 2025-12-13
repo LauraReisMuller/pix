@@ -23,6 +23,11 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
             return false; 
         }
 
+        if (packet.seqn <= it_orig->second.last_req) {
+             log_message("Transaction rejected inside DB: Duplicate ID detected atomically.");
+             return true;
+        }
+
         bool enough_balance = (it_orig->second.balance >= amount);
         bool valid_amount = (amount > 0);
     
