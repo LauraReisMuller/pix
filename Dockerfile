@@ -1,18 +1,34 @@
-FROM gcc:latest
+# --- Estágio 1: Builder (Compilação) ---
+FROM ubuntu:22.04 AS builder
 
-# Instala utilitários básicos (opcional, útil para debug)
-RUN apt-get update && apt-get install -y net-tools iputils-ping
+# Instala compiladores e ferramentas
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cria diretório de trabalho
+WORKDIR /app
+
+# Copia os arquivos necessários respeitando sua estrutura
+# (Copiamos apenas o necessário para aproveitar o cache do Docker)
+COPY Makefile .
+COPY include/ ./include/
+COPY src/ ./src/
+
+# Compila o projeto
+# O README diz para rodar make clean e make
+RUN make clean && make
+
+# --- Estágio 2: Runtime (Imagem Final Leve) ---
+FROM ubuntu:22.04
 
 WORKDIR /app
 
-# Copia todo o código fonte para o container
-COPY . .
+# Copia apenas os executáveis gerados
+COPY --from=builder /app/servidor.exe .
+COPY --from=builder /app/cliente.exe .
 
-# Compila o projeto
-RUN make
-
-# O comando de entrada será definido no docker-compose, mas deixamos um padrão aqui
-#CMD ["./servidor", "1", "4001", "5001"]
-
-# Mantém o container rodando para podermos entrar nele
-CMD ["tail", "-f", "/dev/null"]
+# Instala bibliotecas padrão (geralmente já vem, mas garante compatibilidade de threads)
+RUN apt-get update && apt-get install -y libstdc++6 && rm -rf /var/lib/apt/lists/*

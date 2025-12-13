@@ -91,7 +91,8 @@ void handlePacket(const Packet& packet,
         case PKT_DISCOVER:
             // Descoberta é rápida, pode ser tratada na thread principal (só registro e envio de ACK)
             // Apenas o Líder responde a descoberta de clientes.
-            if (election_manager.isLeader()) {
+            if(true){
+            //if (election_manager.isLeader()) {
                 discovery_handler.handleDiscovery(packet, client_addr, clilen, sockfd);
             } else {
                 log_message("Received PKT_DISCOVER but I'm not the leader. Ignoring.");
@@ -208,7 +209,7 @@ int main(int argc, char* argv[]) {
 
         for (int i = 1; i <= total_servers; i++) {
             // Eu não me adiciono na minha própria lista de réplicas
-            if (i == my_id) continue;
+            if (i == server_id) continue;
 
             // Monta o IP: "10.0.0.1", "10.0.0.2", etc.
             string ip = "10.0.0." + to_string(i);
@@ -242,8 +243,15 @@ int main(int argc, char* argv[]) {
 
         log_message("=== Server ready. Waiting for messages... ===");
 
-        // Loop principal (recebe mensagens de clientes E outras réplicas)
-        runServerLoop(replica_sockfd, discovery_handler, processing_handler);
+        // Crie uma thread separada para lidar com mensagens entre servidores (Eleição/Replicação)
+        thread replicationThread([replica_sockfd, &discovery_handler, &processing_handler]() {
+            runServerLoop(replica_sockfd, discovery_handler, processing_handler);
+        });
+        replicationThread.detach();
+
+        // A thread principal fica no loop ouvindo CLIENTES
+        log_message("=== Server ready");
+        runServerLoop(client_sockfd, discovery_handler, processing_handler);
 
         // Cleanup
         election_manager.stop();

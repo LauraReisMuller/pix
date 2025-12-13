@@ -21,6 +21,8 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
     string client_key = string(client_ip);
     
+    sendDiscoveryAck(sockfd, client_addr, clilen);
+
     // [NOVO] Replica a criação do cliente para os Backups
     // Se falhar a replicação, tecnicamente deveríamos falhar a descoberta,
     // mas para simplificar, vamos apenas logar o erro.
@@ -33,6 +35,4 @@ void ServerDiscovery::handleDiscovery(const Packet& packet, const struct sockadd
     // Aplica localmente (Líder)
     server_db.addClient(client_key);
     server_db.updateBankSummary();
-    
-    sendDiscoveryAck(sockfd, client_addr, clilen);
 }

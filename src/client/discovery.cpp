@@ -1,10 +1,44 @@
 #include "client/discovery.h"
 #include "common/protocol.h"
 #include "common/utils.h"
+#include <ifaddrs.h>
+#include <net/if.h>
 
 #define DISCOVERY_TIMEOUT_SEC 1
 #define MAX_DISCOVERY_ATTEMPTS 50
 
+string getBroadcastAddress() {
+    struct ifaddrs *interfaces = NULL;
+    struct ifaddrs *temp_addr = NULL;
+    string broadcastAddr = "255.255.255.255"; // Valor padrão (fallback)
+
+    // Recupera a lista de interfaces de rede da máquina/container
+    if (getifaddrs(&interfaces) == 0) {
+        temp_addr = interfaces;
+        while (temp_addr != NULL) {
+            // Verifica se é IPv4 (AF_INET)
+            if (temp_addr->ifa_addr && temp_addr->ifa_addr->sa_family == AF_INET) {
+                // Ignora interface de Loopback (127.0.0.1)
+                if (!(temp_addr->ifa_flags & IFF_LOOPBACK)) {
+                    // Verifica se suporta Broadcast
+                    if (temp_addr->ifa_flags & IFF_BROADCAST) {
+                        // Converte o endereço binário de broadcast para string
+                        void* ptr = &((struct sockaddr_in*)temp_addr->ifa_broadaddr)->sin_addr;
+                        char buffer[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, ptr, buffer, INET_ADDRSTRLEN);
+                        
+                        broadcastAddr = string(buffer);
+                        // Geralmente a primeira interface válida (eth0) é a que queremos
+                        break; 
+                    }
+                }
+            }
+            temp_addr = temp_addr->ifa_next;
+        }
+    }
+    freeifaddrs(interfaces);
+    return broadcastAddr;
+}
 
 ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
 
@@ -13,8 +47,12 @@ ClientDiscovery::ClientDiscovery(int port) : _port(port), _sockfd(-1) {
     _serv_addr.sin_family = AF_INET;
     _serv_addr.sin_port = htons(_port);
 
-    // configura o endereço IP para o broadcast
-    _serv_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); 
+    // [MODIFICAÇÃO] Busca o IP de Broadcast real da rede
+    string brd_ip = getBroadcastAddress();
+    _serv_addr.sin_addr.s_addr = inet_addr(brd_ip.c_str());
+    
+    // Log para você saber o que está acontecendo
+    cout << "[DEBUG] Broadcast configurado para: " << brd_ip << endl;
 }
 
 
