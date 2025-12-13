@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # === SERVIDOR 1 (Líder Inicial) ===
+  server1:
+    build: .
+    container_name: server1
+    hostname: server1
+    # Comando: ./servidor.exe <PORTA_CLIENTE> <ID> <IS_LEADER>
+    # Note que agora usamos porta 4000 e 5000 fixas, pois o IP muda
+    command: ./servidor.exe 4000 1 1 
+    networks:
+      pix_net:
+        ipv4_address: 10.0.0.1
+    volumes:
+      - .:/app # Permite editar o código no seu PC e recompilar dentro sem recriar o container
+
+  # === SERVIDOR 2 (Backup) ===
+  server2:
+    build: .
+    container_name: server2
+    hostname: server2
+    command: ./servidor.exe 4000 2 0
+    networks:
+      pix_net:
+        ipv4_address: 10.0.0.2
+    volumes:
+      - .:/app
+    depends_on:
+      - server1
+
+  # === SERVIDOR 3 (Backup) ===
+  server3:
+    build: .
+    container_name: server3
+    hostname: server3
+    command: ./servidor.exe 4000 3 0
+    networks:
+      pix_net:
+        ipv4_address: 10.0.0.3
+    volumes:
+      - .:/app
+    depends_on:
+      - server1
+
+  # === SERVIDOR 4 (Backup) ===
+  server4:
+    build: .
+    container_name: server4
+    hostname: server4
+    command: ./servidor.exe 4000 4 0
+    networks:
+      pix_net:
+        ipv4_address: 10.0.0.4
+    volumes:
+      - .:/app
+    depends_on:
+      - server1
+
+  # === CLIENTE (Máquina para você rodar os testes) ===
+  client:
+    build: .
+    container_name: client
+    # O cliente fica parado esperando você entrar nele
+    command: tail -f /dev/null 
+    networks:
+      pix_net:
+        ipv4_address: 10.0.0.100
+    volumes:
+      - .:/app
+
+# Cria a rede com IPs estáticos
+networks:
+  pix_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/16

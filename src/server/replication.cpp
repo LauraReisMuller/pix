@@ -9,6 +9,7 @@ void ReplicationManager::init(int socket, int id, bool is_leader) {
     this->my_id = id;
     this->is_leader_flag = is_leader;
 
+    /*
     // --- CONFIGURAÇÃO HARDCODED (Até o Max fazer a Descoberta) ---
     // Ajuste esses IPs/Portas conforme o seu docker-compose ou teste local
     if (my_id == 0) { // Assumindo Líder na porta 4000
@@ -17,6 +18,7 @@ void ReplicationManager::init(int socket, int id, bool is_leader) {
     } else {
         addReplica(0, "127.0.0.1", 4000); // Líder
     }
+    */
 }
 
 void ReplicationManager::addReplica(int id, string ip, int port) {
