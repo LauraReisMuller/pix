@@ -85,7 +85,7 @@ bool ServerDatabase::addClient(const string& ip_address) {
 }
 
 // Escrita
-bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
+bool ServerDatabase::updateClientLastReq(const string& ip_address, uint32_t req_number) {
     WriteGuard write_lock(client_table_lock);
     auto it = client_table.find(ip_address);
 
@@ -97,7 +97,7 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
     return false;
 }
 
-bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int req_number) {
+bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, uint32_t req_number) {
     auto it = client_table.find(ip_address);
 
     if (it != client_table.end()) {

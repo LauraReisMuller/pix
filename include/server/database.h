@@ -17,7 +17,7 @@ using namespace std;
 
 struct Client {
     string ip;
-    int last_req;
+    uint32_t last_req;
     uint32_t balance;
 
     Packet last_ack_response;
@@ -73,8 +73,8 @@ public:
 
     uint32_t getClientLastReq(const string& ip_address);
 
-    bool updateClientLastReq(const string& ip_address, int req_number);
-    bool updateClientLastReq_unsafe(const string& ip_address, int req_number);
+    bool updateClientLastReq(const string& ip_address, uint32_t req_number);
+    bool updateClientLastReq_unsafe(const string& ip_address, uint32_t req_number);
 
     Packet getClientLastAck(const string& ip_address);
     

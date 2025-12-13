@@ -136,7 +136,7 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
     // Usamos o campo 'origin_addr' para guardar o IP do novo cliente
     pkt.rep.origin_addr = ipToUint32(client_ip);
     pkt.rep.dest_addr = 0; // Não usado
-    pkt.rep.value = 0;     // O valor inicial é padrão no DB, não precisa mandar
+    pkt.rep.value = -1;     // O valor do novo cliente é -1.
 
     int sent_count = 0;
 
@@ -150,7 +150,7 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
         }
     }
 
-    if (sent_count == 0)
+    if (sent_count <= 1)
         return true; // Sem réplicas? Sucesso imediato
 
     // Configura a espera pelo ACK
@@ -187,11 +187,74 @@ bool ReplicationManager::replicateNewClient(const string &client_ip)
     return (acks_received >= 1);
 }
 
+bool ReplicationManager::replicateQuery(const string &client_ip, uint32_t seqn)
+{
+    if (!is_leader_flag)
+        return false;
+
+    Packet pkt;
+    memset(&pkt, 0, sizeof(Packet));
+    pkt.type = PKT_REP_QUERY_REQ; // Define o tipo correto para QUERY
+    pkt.seqn = seqn;                // O ID da requisição é crucial aqui
+    pkt.rep.origin_addr = ipToUint32(client_ip);
+    pkt.rep.dest_addr = 0;          // Não usado em query
+    pkt.rep.value = 0;              // Valor 0
+
+    int sent_count = 0;
+
+    // 1. Envia para todas as réplicas ativas
+    for (const auto &r : replicas)
+    {
+        if (r.active)
+        {
+            sendto(sockfd, &pkt, sizeof(Packet), 0, (struct sockaddr *)&r.addr, sizeof(r.addr));
+            sent_count++;
+        }
+    }
+
+    // Se não houver réplicas (ou só o líder na rede), retorna sucesso imediato
+    if (sent_count <= 1)
+        return true; 
+
+    // 2. Espera pelos ACKs
+    int acks_received = 0;
+    Packet response;
+    struct sockaddr_in from_addr;
+    socklen_t len = sizeof(from_addr);
+
+    // Timeout de 200ms
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 200000;
+
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sockfd, &readfds);
+
+    int rv = select(sockfd + 1, &readfds, NULL, NULL, &tv);
+
+    if (rv > 0)
+    {
+        // Tenta ler a resposta
+        ssize_t n = recvfrom(sockfd, &response, sizeof(Packet), MSG_DONTWAIT, (struct sockaddr *)&from_addr, &len);
+
+        // Verifica se é o ACK de QUERY com o mesmo seqn
+        if (n > 0 && response.type == PKT_REP_QUERY_ACK && response.seqn == seqn)
+        {
+            acks_received++;
+        }
+    }
+
+    // Retorna true se pelo menos 1 backup confirmou (Soft Consistency)
+    return (acks_received >= 1);
+}
+
 // --- LÓGICA DO BACKUP ---
 void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struct sockaddr_in &sender_addr)
 {
 
     cout << "[DEBUG] Backup recebeu pacote tipo: " << pkt.type << endl;
+
 
     if (pkt.type == PKT_REP_CLIENT_REQ)
     {
@@ -205,6 +268,22 @@ void ReplicationManager::handleReplicationMessage(const Packet &pkt, const struc
         Packet ack;
         ack.type = PKT_REP_CLIENT_ACK;
         sendto(sockfd, &ack, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, sizeof(sender_addr));
+    }
+
+    if (pkt.type == PKT_REP_QUERY_REQ){
+        // [CORREÇÃO] Converter uint32 para string antes de passar ao banco
+        string client_ip = uint32ToIp(pkt.rep.origin_addr);
+        
+        // Atualiza apenas o número de sequência (evita replay attack se virar líder)
+        server_db.updateClientLastReq(client_ip, pkt.seqn);
+        
+        Packet ack;
+        memset(&ack, 0, sizeof(Packet)); // Sempre bom zerar
+        ack.type = PKT_REP_QUERY_ACK;
+        ack.seqn = pkt.seqn; // É importante devolver o seqn para o Líder validar
+        
+        sendto(sockfd, &ack, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, sizeof(sender_addr));
+        return; // Retorna para não cair no fluxo de transação abaixo
     }
 
     if (pkt.type != PKT_REPLICATION_REQ)

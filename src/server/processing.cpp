@@ -88,6 +88,15 @@ void ServerProcessing::handleRequest(const Packet& packet, const struct sockaddr
             final_balance = balance;
             
             server_db.updateClientLastReq(origin_ip_str, received_seqn);
+
+            bool replicated = replication_manager.replicateQuery(
+                origin_ip_str, 
+                packet.seqn
+            );
+
+            if (!replicated) {
+                log_message("AVISO: Falha ao replicar QUERY para backups.");
+            }
             
             // Cria e bufferiza ACK
             Packet query_ack;

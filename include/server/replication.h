@@ -51,6 +51,8 @@ public:
                                         uint32_t final_bal_orig, uint32_t final_bal_dest);
     bool replicateNewClient(const string& client_ip);
 
+    bool replicateQuery(const string &client_ip, uint32_t seqn);
+
     // [BACKUP] Recebe ordem do líder e aplica no DB
     void handleReplicationMessage(const Packet& pkt, const struct sockaddr_in& sender_addr);
 };

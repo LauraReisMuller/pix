@@ -40,6 +40,8 @@ typedef enum {
     PKT_REPLICATION_ACK,
     PKT_REP_CLIENT_REQ, //Replica criação de cliente (Servidor Líder -> Servidor Backups)
     PKT_REP_CLIENT_ACK,
+    PKT_REP_QUERY_REQ,
+    PKT_REP_QUERY_ACK,
 
     PKT_ELECTION,      // Inicia eleição (Servidor Backup -> Servidores Backups)
     PKT_ELECTION_OK,   // Resposta OK da eleição (Servidores Backup -> Servidor Líder)

@@ -172,6 +172,7 @@ void handlePacket(const Packet &packet,
 
     case PKT_REPLICATION_REQ:
     case PKT_REP_CLIENT_REQ:
+    case PKT_REP_QUERY_REQ:
         // Recebimento de replicação (Backup recebendo do Líder)
         // Lançamos em thread para manter o padrão não-bloqueante da main
         thread([packet_copy, client_addr_copy]()
@@ -181,6 +182,7 @@ void handlePacket(const Packet &packet,
 
     case PKT_REPLICATION_ACK:
     case PKT_REP_CLIENT_ACK:
+    case PKT_REP_QUERY_ACK:
         // ACK de replicação recebido pelo Líder.
         // Geralmente isso é pego pelo recvfrom dentro do loop de espera do 'replicateTransaction'.
         // Se cair aqui, é porque chegou atrasado ou duplicado. Apenas ignoramos.
