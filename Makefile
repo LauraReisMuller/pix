@@ -7,6 +7,7 @@ SRC_DIR = src
 # Portas padrão
 SERVER_PORT = 4000
 CLIENT_PORT = 4000
+BACKUP_PORT = 4001
 
 all: server client
 
@@ -18,7 +19,9 @@ server:
 	$(SRC_DIR)/server/interface.cpp \
 	$(SRC_DIR)/server/database.cpp \
 	$(SRC_DIR)/server/locks.cpp \
+	$(SRC_DIR)/server/election.cpp \
 	$(SRC_DIR)/common/utils.cpp \
+	$(SRC_DIR)/server/replication.cpp \
 	-o ./servidor.exe
 
 client:
@@ -29,6 +32,22 @@ client:
 	$(SRC_DIR)/client/interface.cpp \
 	$(SRC_DIR)/common/utils.cpp \
 	-o ./cliente.exe
+
+# === SHORTCUTS PARA TESTE DE REPLICAÇÃO (ETAPA 2) ===
+
+# Roda o LÍDER (Porta 4000, ID 0, Leader=1)
+run-leader-rep: server
+	@echo "--- Iniciando LÍDER na porta $(SERVER_PORT) ---"
+	./servidor.exe $(SERVER_PORT) 0 1
+
+# Roda o BACKUP (Porta 4001, ID 1, Leader=0)
+run-backup-rep: server
+	@echo "--- Iniciando BACKUP na porta $(BACKUP_PORT) ---"
+	./servidor.exe $(BACKUP_PORT) 1 0
+
+# === SHORTCUTS PARA TESTE DE ELEIÇÃO (ETAPA 2) ===
+run-leader-elec: server
+	
 
 # Novos targets para executar
 run-server: server

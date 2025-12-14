@@ -1,3 +1,6 @@
+#ifndef SERVER_DATABASE_H
+#define SERVER_DATABASE_H
+
 #include <unordered_map>
 #include <mutex>
 #include <string>
@@ -14,7 +17,7 @@ using namespace std;
 
 struct Client {
     string ip;
-    int last_req;
+    uint32_t last_req;
     uint32_t balance;
 
     Packet last_ack_response;
@@ -70,8 +73,8 @@ public:
 
     uint32_t getClientLastReq(const string& ip_address);
 
-    bool updateClientLastReq(const string& ip_address, int req_number);
-    bool updateClientLastReq_unsafe(const string& ip_address, int req_number);
+    bool updateClientLastReq(const string& ip_address, uint32_t req_number);
+    bool updateClientLastReq_unsafe(const string& ip_address, uint32_t req_number);
 
     Packet getClientLastAck(const string& ip_address);
     
@@ -91,7 +94,11 @@ public:
     void updateBankSummary();
     
     uint32_t getTotalBalance() const;
+
+    void forceClientBalance(const string& ip, uint32_t new_balance); 
 };
 
 // Instância única do banco de dados do servidor
 extern ServerDatabase server_db;
+
+#endif // SERVER_DATABASE_H

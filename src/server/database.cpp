@@ -15,8 +15,19 @@ bool ServerDatabase::makeTransaction(const string& origin_ip, const string& dest
         
         auto it_orig = client_table.find(origin_ip);
         auto it_dest = client_table.find(dest_ip);
-
         bool clients_exist = (it_orig != client_table.end() && it_dest != client_table.end());
+        
+        if (!clients_exist) {
+            // Se não existe, retorna falso ANTES de tentar ler saldo
+            log_message("Transaction failed: Client not found.");
+            return false; 
+        }
+
+        if (packet.seqn <= it_orig->second.last_req) {
+             log_message("Transaction rejected inside DB: Duplicate ID detected atomically.");
+             return true;
+        }
+
         bool enough_balance = (it_orig->second.balance >= amount);
         bool valid_amount = (amount > 0);
     
@@ -74,7 +85,7 @@ bool ServerDatabase::addClient(const string& ip_address) {
 }
 
 // Escrita
-bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_number) {
+bool ServerDatabase::updateClientLastReq(const string& ip_address, uint32_t req_number) {
     WriteGuard write_lock(client_table_lock);
     auto it = client_table.find(ip_address);
 
@@ -86,7 +97,7 @@ bool ServerDatabase::updateClientLastReq(const string& ip_address, int req_numbe
     return false;
 }
 
-bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, int req_number) {
+bool ServerDatabase::updateClientLastReq_unsafe(const string& ip_address, uint32_t req_number) {
     auto it = client_table.find(ip_address);
 
     if (it != client_table.end()) {
@@ -241,8 +252,8 @@ void ServerDatabase::updateBankSummary_unsafe() {
 
 // Escrita / Leitura
 void ServerDatabase::updateBankSummary() {
-    ReadGuard transaction_lock(transaction_history_lock);
     ReadGuard client_lock(client_table_lock);
+    ReadGuard transaction_lock(transaction_history_lock);
     WriteGuard summary_lock(bank_summary_lock);
 
     bank_summary.num_transactions = transaction_history.size();
@@ -267,4 +278,12 @@ uint32_t ServerDatabase::getTotalBalance() const {
     }
 
     return total;
+}
+
+void ServerDatabase::forceClientBalance(const string& ip, uint32_t new_balance) {
+    WriteGuard lock(client_table_lock);
+    auto it = client_table.find(ip);
+    if (it != client_table.end()) {
+        it->second.balance = new_balance; // Sobrescreve sem validar
+    }
 }

@@ -10,6 +10,17 @@
 #include <cstring>
 #include <stdio.h>
 #include <thread>
+#include "server/database.h"
+#include "server/interface.h"
+#include "common/protocol.h" 
+#include "common/utils.h"
+#include "server/replication.h"    
+#include <unistd.h>
+#include <stdexcept>
+#include <iostream>
+#include <string>
+#include <arpa/inet.h>
+#include <cstring> 
 
 class ServerProcessing {
 public:

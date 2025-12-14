@@ -4,11 +4,15 @@
 #include <string>
 #include <netinet/in.h>
 #include "common/protocol.h" 
+#include "server/database.h"
+#include "common/utils.h"
+#include "server/replication.h" 
 
 class ServerDiscovery {
 public:
     void sendDiscoveryAck(int sockfd, const struct sockaddr_in& client_addr, socklen_t clilen);
     void handleDiscovery(const Packet& packet, const struct sockaddr_in& client_addr, socklen_t clilen, int sockfd);
+    void sendServerBroadcast(int sockfd, int my_id, int my_replica_port);
 };
 
 #endif // SERVER_DISCOVERY_H
